@@ -29,7 +29,7 @@ export type Revision = {
 };
 
 export type CommercialTower = {
-  /** Counterflow or Crossflow; blank until chosen. Tower 1 always follows the Technical Proposal's tower type. */
+  /** Counterflow, Crossflow or Closed Circuit; blank until chosen. Tower 1 always follows the Technical Proposal's tower type. */
   flowType: FlowType | "";
   equipment: string;
   model: string;
@@ -344,7 +344,7 @@ export const PARTNERS = [
 /** "customer" copies Customer Detail, "other" uses the typed name, otherwise a partner id. */
 export type Recipient = "customer" | "other" | (typeof PARTNERS)[number]["id"];
 
-export const FLOW_TYPES = ["Counterflow", "Crossflow"] as const;
+export const FLOW_TYPES = ["Counterflow", "Crossflow", "Closed Circuit"] as const;
 export type FlowType = (typeof FLOW_TYPES)[number];
 
 /** The Technical Proposal revision table has this many rows. */

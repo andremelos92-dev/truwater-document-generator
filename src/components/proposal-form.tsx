@@ -128,12 +128,12 @@ export function ProposalForm() {
   async function handleGenerate(kind: DocumentKind) {
     // The tower type starts blank so it's always chosen on purpose.
     if (kind !== "rfq" && !data.flowType) {
-      setError("Select the Tower Type (Counterflow or Crossflow) on the RFQ & Technical Proposal tab first.");
+      setError("Select the Tower Type (Counterflow, Crossflow or Closed Circuit) on the RFQ & Technical Proposal tab first.");
       return;
     }
     const untyped = kind === "commercial" ? data.commercial.towers.findIndex((t, i) => i > 0 && !t.flowType) : -1;
     if (untyped > 0) {
-      setError(`Select the Type (Counterflow or Crossflow) for cooling tower ${untyped + 1}.`);
+      setError(`Select the Type (Counterflow, Crossflow or Closed Circuit) for cooling tower ${untyped + 1}.`);
       return;
     }
     setGenerating(kind);
@@ -358,12 +358,12 @@ export function ProposalForm() {
                   // Same column widths as a left-column spec row, so it lines up with the fields below.
                   <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-center gap-3 sm:w-1/2 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] sm:pr-4">
                     <Label className="block leading-snug">
-                      Counterflow / Crossflow
+                      Counterflow / Crossflow / Closed Circuit
                       {!flowType && (
                         <span className="text-destructive ml-1.5 text-xs font-normal whitespace-nowrap">Select one</span>
                       )}
                     </Label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {FLOW_TYPES.map((type) => (
                         <Button
                           key={type}
@@ -464,7 +464,7 @@ export function ProposalForm() {
                 Tower Type
                 {!data.flowType && <span className="text-destructive text-xs font-normal">Select one</span>}
               </Label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {FLOW_TYPES.map((flowType) => (
                   <Button
                     key={flowType}
