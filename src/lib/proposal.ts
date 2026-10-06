@@ -1,7 +1,7 @@
 export const SPEC_ROWS = [
   { key: "customerRequires", label: "Customer Requires", unit: "#", example: "e.g. 8" },
-  { key: "towerType", label: "Tower Type", unit: "", example: "e.g. FRP, SS309" },
-  { key: "casingMaterial", label: "Casing Material", unit: "", example: "e.g. FRP, SS309" },
+  { key: "towerType", label: "Tower Type", unit: "", example: "e.g. FRP, SS304, SS316" },
+  { key: "casingMaterial", label: "Casing Material", unit: "", example: "e.g. FRP, SS304, SS316" },
   { key: "fillMaterial", label: "Fill Material", unit: "", example: "e.g. PVC" },
   { key: "numberOfCells", label: "Number Of Cells", unit: "#", example: "e.g. 1" },
   { key: "kwCapacity", label: "kW Capacity", unit: "kW", example: "e.g. 1,680" },
