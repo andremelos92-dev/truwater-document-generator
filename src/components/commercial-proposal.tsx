@@ -63,6 +63,9 @@ const TOWER_FIELDS: { key: keyof CommercialTower; label: string; placeholder?: s
 ];
 
 // Tighter cards on phones, the usual spacing from sm up.
+/** Scope of Supply dropdown entry that opens a box to type any other material. */
+const OTHER_MATERIAL = "Other";
+
 const CARD = "gap-4 py-4 sm:gap-5 sm:py-5";
 const PAD = "px-4 sm:px-6";
 
@@ -326,24 +329,40 @@ export function CommercialProposal({
             item.responsibility === "Truwater" ? (
               <div key={index} className="flex min-w-0">
                 {item.materialOptions?.length ? (
-                  <div className="w-[5.25rem] shrink-0">
-                    <NativeSelect
-                      aria-label={`Material for scope item ${index + 1}`}
-                      className="bg-muted/50 h-8 rounded-r-none pr-7 pl-2 font-medium md:text-sm"
-                      value={item.material ?? ""}
-                      onChange={(event) => setScopeField(index, "material", event.target.value)}
-                    >
-                      {/* Keep a saved material that is not one of the options selectable. */}
-                      {[
-                        ...(item.material && !item.materialOptions.includes(item.material) ? [item.material] : []),
-                        ...item.materialOptions,
-                      ].map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </div>
+                  <>
+                    {/* Any material that is not one of the options is "Other", typed in the box beside it. */}
+                    <div className="w-[5.25rem] shrink-0">
+                      <NativeSelect
+                        aria-label={`Material for scope item ${index + 1}`}
+                        className="bg-muted/50 h-8 rounded-r-none pr-7 pl-2 font-medium md:text-sm"
+                        value={item.materialOptions.includes(item.material ?? "") ? item.material : OTHER_MATERIAL}
+                        onChange={(event) => {
+                          const other = event.target.value === OTHER_MATERIAL;
+                          setScopeField(index, "material", other ? "" : event.target.value);
+                          if (other)
+                            requestAnimationFrame(() =>
+                              document.getElementById(`commercial-scope-${index}-other`)?.focus()
+                            );
+                        }}
+                      >
+                        {[...item.materialOptions, OTHER_MATERIAL].map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </div>
+                    {item.materialOptions.includes(item.material ?? "") ? null : (
+                      <Input
+                        id={`commercial-scope-${index}-other`}
+                        aria-label={`Other material for scope item ${index + 1}`}
+                        placeholder="Type material"
+                        className="field-sizing-content -ml-px h-8 w-auto max-w-32 min-w-[6.5rem] shrink-0 rounded-none px-2 font-medium md:text-sm"
+                        value={item.material ?? ""}
+                        onChange={(event) => setScopeField(index, "material", event.target.value)}
+                      />
+                    )}
+                  </>
                 ) : (
                   <Input
                     aria-label={`Material for scope item ${index + 1}`}
