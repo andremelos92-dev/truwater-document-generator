@@ -324,21 +324,34 @@ export function CommercialProposal({
           {data.commercial.scope.map((item, index) =>
             item.responsibility === "Truwater" ? (
               <div key={index} className="flex min-w-0 gap-1.5">
-                <Input
-                  aria-label={`Material for scope item ${index + 1}`}
-                  placeholder="Material"
-                  list={item.materialOptions?.length ? `commercial-scope-${index}-materials` : undefined}
-                  className="w-28 shrink-0 font-medium"
-                  value={item.material ?? ""}
-                  onChange={(event) => setScopeField(index, "material", event.target.value)}
-                />
                 {item.materialOptions?.length ? (
-                  <datalist id={`commercial-scope-${index}-materials`}>
-                    {item.materialOptions.map((option) => (
-                      <option key={option} value={option} />
-                    ))}
-                  </datalist>
-                ) : null}
+                  <div className="w-36 shrink-0">
+                    <NativeSelect
+                      aria-label={`Material for scope item ${index + 1}`}
+                      className="font-medium"
+                      value={item.material ?? ""}
+                      onChange={(event) => setScopeField(index, "material", event.target.value)}
+                    >
+                      {/* Keep a saved material that is not one of the options selectable. */}
+                      {[
+                        ...(item.material && !item.materialOptions.includes(item.material) ? [item.material] : []),
+                        ...item.materialOptions,
+                      ].map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </div>
+                ) : (
+                  <Input
+                    aria-label={`Material for scope item ${index + 1}`}
+                    placeholder="Material"
+                    className="w-36 shrink-0 font-medium"
+                    value={item.material ?? ""}
+                    onChange={(event) => setScopeField(index, "material", event.target.value)}
+                  />
+                )}
                 <Input
                   aria-label={`Truwater scope item ${index + 1}`}
                   className="min-w-0 flex-1"
