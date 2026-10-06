@@ -355,8 +355,9 @@ export function ProposalForm() {
                         }
                   );
                 return (
-                  // Same column widths as a left-column spec row, so it lines up with the fields below.
-                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-center gap-3 sm:w-1/2 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] sm:pr-4">
+                  // The label is as wide as a left-column spec label, so the buttons line up with the fields below;
+                  // the buttons then sit side by side across the row.
+                  <div className="grid items-center gap-x-3 gap-y-2 sm:grid-cols-[calc((50%_-_1.75rem)*6/11)_minmax(0,1fr)]">
                     <Label className="block leading-snug">
                       Counterflow / Crossflow / Closed Circuit
                       {!flowType && (
@@ -369,7 +370,7 @@ export function ProposalForm() {
                           key={type}
                           type="button"
                           size="sm"
-                          className="flex-1"
+                          className="flex-1 sm:flex-none"
                           variant={flowType === type ? "default" : "outline"}
                           aria-pressed={flowType === type}
                           onClick={() => setFlowType(type)}
