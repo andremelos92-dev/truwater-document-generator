@@ -120,6 +120,10 @@ export function createBlankTower(): CommercialTower {
 }
 
 export type CommercialScopeItem = {
+  /** Printed before the description, e.g. "SS316" + "Frameworks". */
+  material?: string;
+  /** Suggested materials offered in the material box. */
+  materialOptions?: string[];
   description: string;
   responsibility: "Truwater" | "Optional" | "Purchaser";
 };
@@ -174,6 +178,9 @@ export type CommercialProposalData = {
   liability: string;
 };
 
+/** Material choices for the framework, mechanical, hardware and fan cylinder scope items. */
+const STRUCTURAL_MATERIALS = ["FRP", "SS304", "SS316"];
+
 export function createInitialCommercialProposal(): CommercialProposalData {
   return {
     revisions: [
@@ -184,16 +191,16 @@ export function createInitialCommercialProposal(): CommercialProposalData {
     signature2: "kenx",
     towers: [createBlankTower()],
     scope: [
-      { description: "SS316 Frameworks", responsibility: "Truwater" },
-      { description: "SS316 Cold Water Basin Supporting Framework", responsibility: "Truwater" },
-      { description: "SS316 Mechanical", responsibility: "Truwater" },
-      { description: "SS316 Bolt & Nut & Hardware’s Wetted Parts", responsibility: "Truwater" },
-      { description: "SS316 Bolt & Nut & Hardware’s Non-wetted Parts", responsibility: "Truwater" },
-      { description: "PP Spray nozzle", responsibility: "Truwater" },
-      { description: "PVC Film Fill- delivered in loose sheets", responsibility: "Truwater" },
-      { description: "PVC Drift Eliminators", responsibility: "Truwater" },
-      { description: "SS316 Fan Cylinders", responsibility: "Truwater" },
-      { description: "Aluminum Alloy Fan Blades c/w Galvanized Steel Fan Hub", responsibility: "Truwater" },
+      { material: "SS316", materialOptions: STRUCTURAL_MATERIALS, description: "Frameworks", responsibility: "Truwater" },
+      { material: "SS316", materialOptions: STRUCTURAL_MATERIALS, description: "Cold Water Basin Supporting Framework", responsibility: "Truwater" },
+      { material: "SS316", materialOptions: STRUCTURAL_MATERIALS, description: "Mechanical", responsibility: "Truwater" },
+      { material: "SS316", materialOptions: STRUCTURAL_MATERIALS, description: "Bolt & Nut & Hardware’s Wetted Parts", responsibility: "Truwater" },
+      { material: "SS316", materialOptions: STRUCTURAL_MATERIALS, description: "Bolt & Nut & Hardware’s Non-wetted Parts", responsibility: "Truwater" },
+      { material: "PP", description: "Spray nozzle", responsibility: "Truwater" },
+      { material: "PVC", description: "Film Fill- delivered in loose sheets", responsibility: "Truwater" },
+      { material: "PVC", description: "Drift Eliminators", responsibility: "Truwater" },
+      { material: "SS316", materialOptions: STRUCTURAL_MATERIALS, description: "Fan Cylinders", responsibility: "Truwater" },
+      { material: "Aluminum Alloy", description: "Fan Blades c/w Galvanized Steel Fan Hub", responsibility: "Truwater" },
       { description: "Direct Drive System", responsibility: "Truwater" },
       { description: "Single Speed, IP55 Enclosure, 3 Phase / 50Hz / 400 V", responsibility: "Truwater" },
       { description: "Special tools for erection commissioning", responsibility: "Truwater" },

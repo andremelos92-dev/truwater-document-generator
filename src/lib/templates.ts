@@ -232,7 +232,7 @@ function commercialValues(data: ProposalData): Record<string, unknown> {
     pricingPages,
     // Scope of supply
     scope: c.scope.map((item) => ({
-      description: item.description,
+      description: [item.material?.trim(), item.description.trim()].filter(Boolean).join(" "),
       truwater: item.responsibility === "Truwater",
       optional: item.responsibility === "Optional",
       purchaser: item.responsibility === "Purchaser",

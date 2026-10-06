@@ -109,7 +109,7 @@ export function CommercialProposal({
     );
   };
 
-  const setScopeField = (index: number, key: "description" | "responsibility", value: string) =>
+  const setScopeField = (index: number, key: "material" | "description" | "responsibility", value: string) =>
     updateCommercialField(
       "scope",
       data.commercial.scope.map((item, itemIndex) =>
@@ -315,17 +315,37 @@ export function CommercialProposal({
       <Card className={CARD}>
         <CardHeader className={PAD}>
           <CardTitle>Scope of Supply</CardTitle>
-          <CardDescription>Items supplied by Truwater. Optional and By Purchaser items print as standard.</CardDescription>
+          <CardDescription>
+            Items supplied by Truwater, printed as material + description. Optional and By Purchaser items print as
+            standard.
+          </CardDescription>
         </CardHeader>
         <CardContent className={cn(PAD, "grid gap-2 sm:grid-cols-2")}>
           {data.commercial.scope.map((item, index) =>
             item.responsibility === "Truwater" ? (
-              <Input
-                key={index}
-                aria-label={`Truwater scope item ${index + 1}`}
-                value={item.description}
-                onChange={(event) => setScopeField(index, "description", event.target.value)}
-              />
+              <div key={index} className="flex min-w-0 gap-1.5">
+                <Input
+                  aria-label={`Material for scope item ${index + 1}`}
+                  placeholder="Material"
+                  list={item.materialOptions?.length ? `commercial-scope-${index}-materials` : undefined}
+                  className="w-28 shrink-0 font-medium"
+                  value={item.material ?? ""}
+                  onChange={(event) => setScopeField(index, "material", event.target.value)}
+                />
+                {item.materialOptions?.length ? (
+                  <datalist id={`commercial-scope-${index}-materials`}>
+                    {item.materialOptions.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
+                ) : null}
+                <Input
+                  aria-label={`Truwater scope item ${index + 1}`}
+                  className="min-w-0 flex-1"
+                  value={item.description}
+                  onChange={(event) => setScopeField(index, "description", event.target.value)}
+                />
+              </div>
             ) : null
           )}
         </CardContent>
