@@ -320,15 +320,16 @@ export function CommercialProposal({
             standard.
           </CardDescription>
         </CardHeader>
-        <CardContent className={cn(PAD, "grid gap-2 sm:grid-cols-2")}>
+        <CardContent className={cn(PAD, "grid gap-x-3 gap-y-1.5 sm:grid-cols-2")}>
+          {/* Material and description are joined into one control. */}
           {data.commercial.scope.map((item, index) =>
             item.responsibility === "Truwater" ? (
-              <div key={index} className="flex min-w-0 gap-1.5">
+              <div key={index} className="flex min-w-0">
                 {item.materialOptions?.length ? (
-                  <div className="w-36 shrink-0">
+                  <div className="w-[5.25rem] shrink-0">
                     <NativeSelect
                       aria-label={`Material for scope item ${index + 1}`}
-                      className="font-medium"
+                      className="bg-muted/50 h-8 rounded-r-none pr-7 pl-2 font-medium md:text-sm"
                       value={item.material ?? ""}
                       onChange={(event) => setScopeField(index, "material", event.target.value)}
                     >
@@ -347,14 +348,14 @@ export function CommercialProposal({
                   <Input
                     aria-label={`Material for scope item ${index + 1}`}
                     placeholder="Material"
-                    className="w-36 shrink-0 font-medium"
+                    className="bg-muted/50 field-sizing-content h-8 w-auto max-w-32 min-w-[5.25rem] shrink-0 rounded-r-none px-2 font-medium md:text-sm"
                     value={item.material ?? ""}
                     onChange={(event) => setScopeField(index, "material", event.target.value)}
                   />
                 )}
                 <Input
                   aria-label={`Truwater scope item ${index + 1}`}
-                  className="min-w-0 flex-1"
+                  className="-ml-px h-8 min-w-0 flex-1 rounded-l-none px-2 md:text-sm"
                   value={item.description}
                   onChange={(event) => setScopeField(index, "description", event.target.value)}
                 />
