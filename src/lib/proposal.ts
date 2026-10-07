@@ -74,6 +74,7 @@ export const PORT_DELIVERY: Partial<Record<string, { site: string; address: stri
   },
   Brisbane: { site: "Cooling Towers Solutions Pty Ltd", address: "1/26 Octal Street, Yatala Qld 4207" },
   Fremantle: { site: "Elite Solutions Mechanical Group", address: "PO BOX 1015, Bibra Lake WA 6965" },
+  Melbourne: { site: "KVP Industrial Cleaning", address: "Dandenong VIC 3175" },
 };
 
 /** Tower fields filled from that tower type's Cooling Tower Specification. */
@@ -341,6 +342,7 @@ export const PARTNERS = [
   { id: "sydney", region: "Sydney", name: "Complete Cooling Towers Service and Spares Pty Ltd" },
   { id: "queensland", region: "Queensland", name: "Cooling Tower Solutions" },
   { id: "wa", region: "WA", name: "Elite Solutions Mechanical Group" },
+  { id: "victoria", region: "Victoria", name: "KVP Industrial Cleaning" },
 ] as const;
 
 /** "customer" copies Customer Detail, "other" uses the typed name, otherwise a partner id. */
