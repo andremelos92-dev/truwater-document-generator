@@ -6,6 +6,7 @@ import { Eye, FileDown, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { CommercialProposal } from "@/components/commercial-proposal";
 import { DocumentPreview, type PreviewDocument } from "@/components/document-preview";
 import { ScanDocumentButton } from "@/components/scan-document";
+import { markUnfilled, type ScanMarks } from "@/lib/scan-marks";
 import { SelectionSummaryButton } from "@/components/selection-summary";
 import { RevisionsEditor } from "@/components/revisions-editor";
 import { SaveToHistory } from "@/components/save-to-history";
@@ -83,6 +84,8 @@ export function ProposalForm() {
   const [activeTab, setActiveTab] = useState<"documents" | "commercial">("documents");
   const [generating, setGenerating] = useState<{ kind: DocumentKind; preview: boolean } | null>(null);
   const [preview, setPreview] = useState<PreviewDocument | null>(null);
+  /** Commercial boxes the last scans didn't fill, marked until they're changed. */
+  const [scanMarks, setScanMarks] = useState<ScanMarks | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // An entry loaded on the History page arrives here once, then is cleared.
@@ -202,6 +205,8 @@ export function ProposalForm() {
           onGenerate={() => void handleGenerate("commercial")}
           onPreview={() => void handleGenerate("commercial", { preview: true })}
           generating={generating?.kind === "commercial" ? (generating.preview ? "preview" : "download") : null}
+          scanMarks={scanMarks}
+          onClearScanMarks={() => setScanMarks(null)}
           error={error}
         />
       ) : (
@@ -211,7 +216,13 @@ export function ProposalForm() {
           <CardTitle>Project Details</CardTitle>
           <CardDescription className="col-start-1">Used by both the RFQ and the Technical Proposal.</CardDescription>
           <div className="col-start-2 row-span-2 row-start-1 self-start">
-            <ScanDocumentButton data={data} onApply={(update) => setData(update)} />
+            <ScanDocumentButton
+              data={data}
+              onApply={(next, scan) => {
+                setData(next);
+                setScanMarks((previous) => markUnfilled(previous, next, scan.towerIndex, scan.filled, scan.fileName));
+              }}
+            />
           </div>
         </CardHeader>
         <CardContent className="grid gap-5">
@@ -517,7 +528,14 @@ export function ProposalForm() {
       {error && <p className="text-destructive text-sm">{error}</p>}
 
       <div className="flex flex-wrap justify-end gap-3">
-        <Button type="button" variant="outline" onClick={() => setData(createInitialProposal())}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            setData(createInitialProposal());
+            setScanMarks(null);
+          }}
+        >
           <RotateCcw /> Reset
         </Button>
         <SaveToHistory data={data} kinds={["rfq", "proposal"]} />

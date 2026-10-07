@@ -31,7 +31,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { Eye, FileDown, Loader2 } from "lucide-react";
+import { Eye, FileDown, Loader2, TriangleAlert } from "lucide-react";
+import { isMarked, scopeBox, towerBox, type ScanMarks } from "@/lib/scan-marks";
 import { useState } from "react";
 
 type CommercialProposalProps = {
@@ -42,7 +43,21 @@ type CommercialProposalProps = {
   /** Which action is building the document right now, if any. */
   generating: "download" | "preview" | null;
   error: string | null;
+  /** Boxes the last document scans didn't fill (marked with *), and clearing them. */
+  scanMarks: ScanMarks | null;
+  onClearScanMarks: () => void;
 };
+
+/** Outline for a box a scan didn't fill. */
+const MARKED = "border-amber-500 bg-amber-50 ring-2 ring-amber-400/40 dark:bg-amber-500/10";
+
+function ScanStar() {
+  return (
+    <span className="font-bold text-amber-600 dark:text-amber-400" title="Not filled by the scan – check by hand">
+      *
+    </span>
+  );
+}
 
 /**
  * Same order as the equipment table in the Commercial Proposal document. `wide` fields take a full row
@@ -88,7 +103,11 @@ export function CommercialProposal({
   onPreview,
   generating,
   error,
+  scanMarks,
+  onClearScanMarks,
 }: CommercialProposalProps) {
+  const marked = (key: string) => isMarked(scanMarks, data, key);
+  const markedCount = scanMarks ? [...scanMarks.boxes.keys()].filter(marked).length : 0;
   /** Scope rows with "Other" chosen but nothing typed yet (an empty material otherwise means "—"). */
   const [otherScopeRows, setOtherScopeRows] = useState<Set<number>>(() => new Set());
   const title = projectTitle(data) || "Project name from Documents form";
@@ -129,6 +148,20 @@ export function CommercialProposal({
 
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6" role="tabpanel" aria-label="Commercial Proposal">
+      {scanMarks && markedCount > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+          <TriangleAlert className="size-4 shrink-0" />
+          <p className="min-w-0 flex-1">
+            <span className="font-semibold">
+              {markedCount} {markedCount === 1 ? "box" : "boxes"} not filled by the scan
+            </span>{" "}
+            of {scanMarks.fileName} — marked <ScanStar /> below. Each mark clears once you change that box.
+          </p>
+          <Button type="button" variant="outline" size="sm" className="bg-background" onClick={onClearScanMarks}>
+            Clear marks
+          </Button>
+        </div>
+      )}
       <Card className={CARD}>
         <CardHeader className={cn(PAD, "flex flex-wrap items-baseline gap-x-2 gap-y-0.5")}>
           <CardTitle>Cover</CardTitle>
@@ -149,11 +182,13 @@ export function CommercialProposal({
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
             <div className="grid content-start gap-1">
-              <Label htmlFor="commercial-attention" className="text-xs">ATTN.</Label>
+              <Label htmlFor="commercial-attention" className="text-xs">
+                ATTN.{marked("attention") && <ScanStar />}
+              </Label>
               <Input
                 id="commercial-attention"
                 placeholder="e.g. Aaron Hughes & Cale Watson"
-                className="h-8 md:text-sm"
+                className={cn("h-8 md:text-sm", marked("attention") && MARKED)}
                 value={data.commercial.attention}
                 onChange={(event) => updateCommercialField("attention", event.target.value)}
               />
@@ -198,7 +233,9 @@ export function CommercialProposal({
             <CardContent className={cn(PAD, "grid gap-4")}>
               <div className="bg-muted/40 grid grid-cols-2 gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,1.5fr)_5rem_minmax(0,1.5fr)_minmax(0,1.2fr)]">
                 <div className="col-span-2 grid content-start gap-1.5 sm:col-span-1">
-                  <Label htmlFor={`commercial-tower-${index}-price`}>1.1 Material price (AUD)</Label>
+                  <Label htmlFor={`commercial-tower-${index}-price`}>
+                    1.1 Material price (AUD){marked(towerBox(index, "price")) && <ScanStar />}
+                  </Label>
                   <Input
                     id={`commercial-tower-${index}-price`}
                     type="number"
@@ -206,20 +243,22 @@ export function CommercialProposal({
                     min="0"
                     step="0.01"
                     placeholder="e.g. 389449"
-                    className="bg-background"
+                    className={cn("bg-background", marked(towerBox(index, "price")) && MARKED)}
                     value={tower.price}
                     onChange={(event) => setTowerField(index, "price", event.target.value)}
                   />
                 </div>
                 <div className="grid content-start gap-1.5">
-                  <Label htmlFor={`commercial-tower-${index}-quantity`}>Qty</Label>
+                  <Label htmlFor={`commercial-tower-${index}-quantity`}>
+                    Qty{marked(towerBox(index, "quantity")) && <ScanStar />}
+                  </Label>
                   <Input
                     id={`commercial-tower-${index}-quantity`}
                     type="number"
                     inputMode="numeric"
                     min="1"
                     step="1"
-                    className="bg-background"
+                    className={cn("bg-background", marked(towerBox(index, "quantity")) && MARKED)}
                     value={tower.quantity}
                     onChange={(event) => setTowerField(index, "quantity", event.target.value)}
                   />
@@ -236,10 +275,12 @@ export function CommercialProposal({
                   />
                 </div>
                 <div className="col-span-2 grid content-start gap-1.5 sm:col-span-1">
-                  <Label htmlFor={`commercial-tower-${index}-port`}>C&amp;F Port</Label>
+                  <Label htmlFor={`commercial-tower-${index}-port`}>
+                    C&amp;F Port{marked(towerBox(index, "port")) && <ScanStar />}
+                  </Label>
                   <NativeSelect
                     id={`commercial-tower-${index}-port`}
-                    className="bg-background"
+                    className={cn("bg-background", marked(towerBox(index, "port")) && MARKED)}
                     value={(PORTS as readonly string[]).includes(tower.port) ? tower.port : OTHER_PORT}
                     onChange={(event) =>
                       setTowerField(index, "port", event.target.value === OTHER_PORT ? "" : event.target.value)
@@ -266,6 +307,7 @@ export function CommercialProposal({
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
                 {TOWER_FIELDS.map(({ key, label, placeholder, wide }) => {
                   const source = fieldSource(index, key);
+                  const isMarkedBox = marked(towerBox(index, key));
                   return (
                     <div
                       key={key}
@@ -273,6 +315,7 @@ export function CommercialProposal({
                     >
                       <Label htmlFor={`commercial-tower-${index}-${key}`} className="text-xs sm:text-sm">
                         {label}
+                        {isMarkedBox && <ScanStar />}
                         {source && (
                           <span className="text-primary text-[10px] font-semibold">
                             {key === "model" || key === "flowType" ? "TECH PROP" : index === 0 ? "RFQ" : `SPEC ${index + 1}`}
@@ -282,6 +325,7 @@ export function CommercialProposal({
                       {key === "flowType" && !source ? (
                         <NativeSelect
                           id={`commercial-tower-${index}-${key}`}
+                          className={cn(isMarkedBox && MARKED)}
                           value={tower.flowType}
                           onChange={(event) => setTowerField(index, "flowType", event.target.value as FlowType)}
                         >
@@ -301,13 +345,17 @@ export function CommercialProposal({
                           tabIndex={-1}
                           placeholder={`Fill in on ${source === "Technical Proposal" ? "Tech Prop" : source}`}
                           title={`From the ${source} – change it there`}
-                          className="bg-muted cursor-default placeholder:italic focus-visible:ring-0"
+                          className={cn(
+                            "bg-muted cursor-default placeholder:italic focus-visible:ring-0",
+                            isMarkedBox && MARKED
+                          )}
                           value={tower[key]}
                         />
                       ) : (
                         <Input
                           id={`commercial-tower-${index}-${key}`}
                           placeholder={placeholder}
+                          className={cn(isMarkedBox && MARKED)}
                           value={tower[key]}
                           onChange={(event) => setTowerField(index, key, event.target.value)}
                         />
@@ -334,7 +382,18 @@ export function CommercialProposal({
           {/* Material and description are joined into one control. */}
           {data.commercial.scope.map((item, index) =>
             item.responsibility === "Truwater" ? (
-              <div key={index} className="flex min-w-0">
+              <div
+                key={index}
+                className={cn(
+                  "relative flex min-w-0 rounded-md",
+                  marked(scopeBox(index)) && "ring-2 ring-amber-400/70 ring-offset-1"
+                )}
+              >
+                {marked(scopeBox(index)) && (
+                  <span className="absolute -top-1.5 -left-1 z-10 leading-none">
+                    <ScanStar />
+                  </span>
+                )}
                 {(() => {
                   const material = item.material ?? "";
                   const options = item.materialOptions ?? [];
@@ -407,31 +466,40 @@ export function CommercialProposal({
         </CardHeader>
         <CardContent className={cn(PAD, "grid grid-cols-2 gap-3 sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,2fr)]")}>
           <div className="grid content-start gap-1.5">
-            <Label htmlFor="commercial-delivery-time">Delivery Time</Label>
+            <Label htmlFor="commercial-delivery-time">
+              Delivery Time{marked("deliveryTime") && <ScanStar />}
+            </Label>
             <Input
               id="commercial-delivery-time"
               placeholder="e.g. 14-16 Weeks"
+              className={cn(marked("deliveryTime") && MARKED)}
               value={data.commercial.deliveryTime}
               onChange={(event) => updateCommercialField("deliveryTime", event.target.value)}
             />
           </div>
           <div className="grid content-start gap-1.5">
-            <Label htmlFor="commercial-containers">Containers</Label>
+            <Label htmlFor="commercial-containers">
+              Containers{marked("containers") && <ScanStar />}
+            </Label>
             <Input
               id="commercial-containers"
               type="number"
               inputMode="numeric"
               min="1"
               step="1"
+              className={cn(marked("containers") && MARKED)}
               value={data.commercial.containers}
               onChange={(event) => updateCommercialField("containers", event.target.value)}
             />
           </div>
           <div className="col-span-2 grid content-start gap-1.5 sm:col-span-1">
-            <Label htmlFor="commercial-delivery-site">Delivered To Site At</Label>
+            <Label htmlFor="commercial-delivery-site">
+              Delivered To Site At{marked("deliverySite") && <ScanStar />}
+            </Label>
             <Input
               id="commercial-delivery-site"
               placeholder={delivery?.site || data.projectAddress || "Site name"}
+              className={cn(marked("deliverySite") && MARKED)}
               value={data.commercial.deliverySite}
               onChange={(event) => updateCommercialField("deliverySite", event.target.value)}
             />

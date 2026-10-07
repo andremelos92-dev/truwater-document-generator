@@ -34,7 +34,21 @@ export type ScanFieldId =
   | "fanDriveType"
   | "dimensions"
   | "dryWeight"
-  | "designOperatingWeight";
+  | "designOperatingWeight"
+  // Commercial Proposal: cover ATTN., the tower's cold water basin and the Scope of Supply.
+  | "attention"
+  | "basin"
+  | "scopeFramework"
+  | "scopeBasinSupport"
+  | "scopeBoltsWetted"
+  | "scopeBoltsNonWetted"
+  | "scopeNozzle"
+  | "scopeFill"
+  | "scopeDrift"
+  | "scopeFanCylinder"
+  | "scopeFanBlades"
+  | "scopeDrive"
+  | "scopeMotor";
 
 /** A value found in the document, with the text it came from (shown in the review list). */
 export type ScanFinding = { value: string; source: string };
@@ -100,7 +114,16 @@ type RawKey =
   | "fanQuantity"
   | "fanDiameter"
   | "fanKw"
-  | "drive";
+  | "drive"
+  | "framework"
+  | "basin"
+  | "basinSupport"
+  | "bolts"
+  | "waterDistribution"
+  | "drift"
+  | "fanCylinder"
+  | "blades"
+  | "electric";
 
 /**
  * Labels for each value, tried at the start of a cell (case-insensitive). The bid form wording
@@ -135,6 +158,15 @@ const LABELS: Record<RawKey, RegExp[]> = {
   fanDiameter: [/^fan diameter/i],
   fanKw: [/^rated kw per cell/i, /^(fan\s+)?motor (power|rating|kw)/i, /^fan kw/i],
   drive: [/^type of drive/i, /^(fan\s+)?drive(\s+type)?(?=\s*:|$)/i],
+  framework: [/^framework members/i, /^(main\s+)?framework(?=\s*:|$)/i],
+  basin: [/^cold water basin(?=\s*:|$)/i],
+  basinSupport: [/^cold water basin support(ing)? frame(work)?/i],
+  bolts: [/^bolts?,?\s*nuts?\s*(&|and)\s*washers/i, /^(bolts|fasteners|hardware)(?=\s*:|$)/i],
+  waterDistribution: [/^water distribution system/i],
+  drift: [/^drift eliminators?(?=\s*:|$)/i],
+  fanCylinder: [/^fan (cylinder|stack)s?/i],
+  blades: [/^blade material/i, /^fan blades?(\s+material)?(?=\s*:|$)/i],
+  electric: [/^electric(al)? characteristics/i, /^power supply/i],
 };
 
 /** Other labels that end a value: the bid form header puts a second label column on the same lines. */
@@ -225,6 +257,32 @@ const material = (value: string) =>
     .replace(/\bSS\s+(\d{3})/gi, "SS$1")
     .replace(/\s+/g, " ")
     .trim();
+
+/**
+ * The Scope of Supply material named in a bid form value: "Pultruded FRP" -> "FRP", "Internal SS 316" ->
+ * "SS316", "HDGS (OSHA standard)" -> "HDGS". Anything else is kept as written.
+ */
+function scopeMaterial(value: string): string {
+  const stainless = /\bSS\s*-?\s*(304|316)L?\b/i.exec(value);
+  if (stainless) return `SS${stainless[1]}`;
+  if (/\bHDG|galvani[sz]ed/i.test(value)) return "HDGS";
+  if (/FRP|fib(re|er)\s*glass/i.test(value)) return "FRP";
+  if (/\bPVC\b/i.test(value)) return "PVC";
+  if (/polypropylene|\bPP\b/i.test(value)) return "PP";
+  if (/alumin(i)?um/i.test(value)) return "Aluminum Alloy";
+  return material(value);
+}
+
+/** "Wetted: SS 304, Non Wetted: HDGS" -> each part's material; one material means both. */
+function boltMaterials(value: string): { wetted: string; nonWetted: string } {
+  const nonWetted = /non[\s-]*wetted\s*:?\s*([^,;]+)/i.exec(value)?.[1];
+  const wetted = /(?<!non[\s-]*)\bwetted\s*:?\s*([^,;]+)/i.exec(value)?.[1];
+  if (wetted || nonWetted) {
+    return { wetted: wetted ? scopeMaterial(wetted) : "", nonWetted: nonWetted ? scopeMaterial(nonWetted) : "" };
+  }
+  const both = scopeMaterial(value);
+  return { wetted: both, nonWetted: both };
+}
 
 /** "ECX 1212D2-3B (CT01 & 02)" -> model "ECX 1212D2-3B", equipment "CT01 & 02". */
 function splitModel(value: string) {
@@ -338,6 +396,44 @@ export function parseScan(lines: Line[]): ScanResult {
   if (drive) {
     const kind = /belt/i.test(drive.value) ? "Belt" : /direct/i.test(drive.value) ? "Direct" : /gear/i.test(drive.value) ? "Gear" : drive.value;
     set("fanDriveType", kind, drive);
+    // Scope of Supply line: "Belt & Pulley" -> "Belt & Pulley Drive System", "Direct Drive" -> "Direct Drive System".
+    set("scopeDrive", `${drive.value.replace(/\s*drive\s*$/i, "")} Drive System`, drive);
+  }
+
+  // Commercial Proposal.
+  set("attention", attn?.value, attn);
+  const basin = find(lines, "basin");
+  set("basin", basin && scopeMaterial(basin.value), basin);
+  for (const [key, id] of [
+    ["framework", "scopeFramework"],
+    ["basinSupport", "scopeBasinSupport"],
+    ["drift", "scopeDrift"],
+    ["fanCylinder", "scopeFanCylinder"],
+    ["blades", "scopeFanBlades"],
+  ] as const) {
+    const found = find(lines, key);
+    set(id, found && scopeMaterial(found.value), found);
+  }
+  set("scopeFill", fill && scopeMaterial(fill.value), fill);
+  const bolts = find(lines, "bolts");
+  if (bolts) {
+    const { wetted, nonWetted } = boltMaterials(bolts.value);
+    set("scopeBoltsWetted", wetted, bolts);
+    set("scopeBoltsNonWetted", nonWetted, bolts);
+  }
+  const distribution = find(lines, "waterDistribution");
+  set("scopeNozzle", distribution && /polypropylene|\bPP\b/i.test(distribution.value) ? "PP" : null, distribution);
+
+  // Motor line, e.g. "Single Speed, IP55 Enclosure, 3 Phase / 50Hz / 400 V". The IP rating sits in the motor's
+  // "Type" (a second "Type" label), so it's taken from wherever "IP 55" appears.
+  const electric = find(lines, "electric", (v) => /phase|hz|\dv\b|\d\s*v\b/i.test(v));
+  if (electric) {
+    const phase = /(\d)\s*-?\s*ph(ase)?/i.exec(electric.value)?.[1];
+    const hz = /(\d{2})\s*hz/i.exec(electric.value)?.[1];
+    const volts = /(\d{3}(?:\s*-\s*\d{3})?)\s*v\b/i.exec(electric.value)?.[1]?.replace(/\s/g, "");
+    const ip = lines.flat().map((cell) => /\bIP\s*(\d{2})\b/i.exec(cell)?.[1]).find(Boolean);
+    const supply = [phase && `${phase} Phase`, hz && `${hz}Hz`, volts && `${volts} V`].filter(Boolean).join(" / ");
+    if (supply) set("scopeMotor", ["Single Speed", ip && `IP${ip} Enclosure`, supply].filter(Boolean).join(", "), electric);
   }
 
   return result;

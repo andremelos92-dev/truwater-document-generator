@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Loader2, ScanLine, TriangleAlert, X } from "lucide-react";
 
 import { MAX_TOWER_TYPES, type ProposalData } from "@/lib/proposal";
-import { SCAN_FIELDS, applyScan, currentScanValue, type ScanField } from "@/lib/scan-fields";
+import { SCAN_FIELDS, applyScan, canApply, currentScanValue, isUntouched, type ScanField } from "@/lib/scan-fields";
 import { parseScan, toLines, type ScanFieldId, type ScanResult } from "@/lib/scan-parse";
 import { readDocument } from "@/lib/scan-source";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,12 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 
+/** What a scan filled: the file, the tower type it went into and the fields applied. */
+export type AppliedScan = { fileName: string; towerIndex: number; filled: ScanFieldId[] };
+
 type ScanDocumentButtonProps = {
   data: ProposalData;
-  onApply: (update: (previous: ProposalData) => ProposalData) => void;
+  onApply: (next: ProposalData, scan: AppliedScan) => void;
 };
 
 type Target = number | "new";
@@ -49,14 +52,18 @@ export function ScanDocumentButton({ data, onApply }: ScanDocumentButtonProps) {
   const targetIndex = target === "new" ? towerCount : target;
   const current = (id: ScanFieldId) => (target === "new" && SCAN_FIELDS.find((f) => f.id === id)?.group === "tower" ? "" : currentScanValue(data, id, targetIndex));
 
-  /** Ticks every found value that wouldn't replace something already typed differently. */
+  /**
+   * Ticks every found value that wouldn't replace something already typed differently. Starting values
+   * (like the SS316 scope defaults) don't count as typed.
+   */
   const defaultChecks = (result: ScanResult, to: Target) =>
     new Set(
       SCAN_FIELDS.filter(({ id, group }) => {
         const found = result[id]?.value;
-        if (!found) return false;
-        const now = to === "new" && group === "tower" ? "" : currentScanValue(data, id, to === "new" ? towerCount : to);
-        return !now.trim() || now.trim() === found;
+        if (!found || !canApply(data, id)) return false;
+        if (to === "new" && group === "tower") return true;
+        const index = to === "new" ? towerCount : to;
+        return isUntouched(data, id, index) || currentScanValue(data, id, index).trim() === found;
       }).map(({ id }) => id)
     );
 
@@ -92,14 +99,16 @@ export function ScanDocumentButton({ data, onApply }: ScanDocumentButtonProps) {
   const close = () => dialogRef.current?.close();
 
   function apply() {
-    const chosen = Object.fromEntries([...checked].map((id) => [id, values[id] ?? ""]));
-    onApply((previous) => applyScan(previous, chosen, target));
+    if (state.phase !== "review") return;
+    const filled = [...checked].filter((id) => values[id]?.trim());
+    const chosen = Object.fromEntries(filled.map((id) => [id, values[id] ?? ""]));
+    onApply(applyScan(data, chosen, target), { fileName: state.fileName, towerIndex: targetIndex, filled });
     close();
   }
 
   const row = (field: ScanField, result: ScanResult) => {
     const finding = result[field.id];
-    if (!finding) return null;
+    if (!finding || !canApply(data, field.id)) return null;
     const now = current(field.id);
     const isChecked = checked.has(field.id);
     const toggle = () =>
@@ -237,12 +246,16 @@ export function ScanDocumentButton({ data, onApply }: ScanDocumentButtonProps) {
                     Check each value against the document. Ticked values are filled in; values that would replace
                     something already typed start unticked.
                   </p>
-                  {(["project", "tower"] as const).map((group) => {
+                  {(["project", "tower", "scope"] as const).map((group) => {
                     const rows = SCAN_FIELDS.filter((field) => field.group === group).map((field) => row(field, state.result));
                     return rows.some(Boolean) ? (
                       <section key={group}>
                         <h3 className="mb-1 text-sm font-semibold">
-                          {group === "project" ? "Project & contact" : "Cooling tower specification"}
+                          {group === "project"
+                            ? "Project & contact"
+                            : group === "tower"
+                              ? "Cooling tower specification"
+                              : "Commercial Proposal · Scope of Supply (all tower types)"}
                         </h3>
                         <div>{rows}</div>
                       </section>
