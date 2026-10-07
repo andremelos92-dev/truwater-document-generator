@@ -288,7 +288,20 @@ export type ProposalData = {
   otherRecipient: string;
   revisions: Revision[];
   commercial: CommercialProposalData;
+  /** Selection Summary details not on the forms, one per tower type (missing = defaults). */
+  selectionSummary: SummaryExtra[];
 };
+
+/** Selection Summary email details that aren't typed anywhere else. */
+export type SummaryExtra = {
+  /** Blank = worked out from the dimensions (equal length and width = Square). */
+  shape: string;
+  airIntakes: string;
+  dryWeight: string;
+  ctiCertified: boolean;
+};
+
+export const EMPTY_SUMMARY_EXTRA: SummaryExtra = { shape: "", airIntakes: "", dryWeight: "", ctiCertified: true };
 
 type TowerSource = Pick<ProposalData, "commercial" | "towerModel" | "flowType" | "spec" | "extraSpecs">;
 
@@ -326,10 +339,14 @@ export function addTowerType<T extends Pick<ProposalData, "extraSpecs" | "commer
 }
 
 /** Removes tower type `index` (1 or more) with its Commercial Proposal tower. */
-export function removeTowerType<T extends Pick<ProposalData, "extraSpecs" | "commercial">>(data: T, index: number): T {
+export function removeTowerType<T extends Pick<ProposalData, "extraSpecs" | "commercial" | "selectionSummary">>(
+  data: T,
+  index: number
+): T {
   return {
     ...data,
     extraSpecs: data.extraSpecs.filter((_, i) => i !== index - 1),
+    selectionSummary: data.selectionSummary.filter((_, i) => i !== index),
     commercial: { ...data.commercial, towers: data.commercial.towers.filter((_, i) => i !== index) },
   };
 }
@@ -409,6 +426,7 @@ export function createInitialProposal(): ProposalData {
     otherRecipient: "",
     revisions: [createRevision("0")],
     commercial: createInitialCommercialProposal(),
+    selectionSummary: [],
   };
 }
 

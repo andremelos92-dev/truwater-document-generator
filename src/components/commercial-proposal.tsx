@@ -18,6 +18,7 @@ import {
 } from "@/lib/proposal";
 import { RevisionsEditor } from "@/components/revisions-editor";
 import { SaveToHistory } from "@/components/save-to-history";
+import { SelectionSummaryButton } from "@/components/selection-summary";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -444,6 +445,7 @@ export function CommercialProposal({
       {error && <p className="text-destructive text-sm" role="alert">{error}</p>}
       <div className="grid gap-2 sm:flex sm:justify-end sm:gap-3 [&_button]:w-full sm:[&_button]:w-auto">
         <SaveToHistory data={data} kinds={["commercial"]} />
+        <SelectionSummaryButton data={data} onExtrasChange={(selectionSummary) => onChange({ selectionSummary })} />
         <Button type="button" size="lg" disabled={generating} onClick={onGenerate}>
           {generating ? <Loader2 className="animate-spin" /> : <FileDown />}
           Generate Commercial Proposal

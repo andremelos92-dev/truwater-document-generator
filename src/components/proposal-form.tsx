@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import { FileDown, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { CommercialProposal } from "@/components/commercial-proposal";
+import { SelectionSummaryButton } from "@/components/selection-summary";
 import { RevisionsEditor } from "@/components/revisions-editor";
 import { SaveToHistory } from "@/components/save-to-history";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,7 @@ import { cn } from "@/lib/utils";
 
 type TextField = Exclude<
   keyof ProposalData,
-  "spec" | "extraSpecs" | "revisions" | "flowType" | "recipient" | "commercial"
+  "spec" | "extraSpecs" | "revisions" | "flowType" | "recipient" | "commercial" | "selectionSummary"
 >;
 
 const RECIPIENT_OPTIONS: { value: Recipient; label: string }[] = [
@@ -507,6 +508,10 @@ export function ProposalForm() {
           <RotateCcw /> Reset
         </Button>
         <SaveToHistory data={data} kinds={["rfq", "proposal"]} />
+        <SelectionSummaryButton
+          data={data}
+          onExtrasChange={(selectionSummary) => setData((prev) => ({ ...prev, selectionSummary }))}
+        />
         {(Object.keys(DOCUMENTS) as (keyof typeof DOCUMENTS)[]).map((kind) => (
           <Button key={kind} type="submit" value={kind} size="lg" disabled={!!generating}>
             {generating === kind ? <Loader2 className="animate-spin" /> : <FileDown />}
