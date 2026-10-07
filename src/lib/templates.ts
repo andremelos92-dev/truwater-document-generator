@@ -171,7 +171,7 @@ const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "sev
 
 /**
  * "Base Cooling Tower Price basis shall be delivered to site at <site>, from <port> Port to <address> in CKD …
- * four (4) containers …". Sydney and Brisbane have a default site and address; a typed site replaces the name.
+ * four (4) containers …". Sydney, Brisbane and Fremantle have a default site and address; a typed site replaces the name.
  */
 function priceBasis(data: ProposalData, port: string): string {
   const delivery = PORT_DELIVERY[port.trim()];

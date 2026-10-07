@@ -73,6 +73,7 @@ export const PORT_DELIVERY: Partial<Record<string, { site: string; address: stri
     address: "Unit 1/3 Jayelem Crescent, Padstow NSW 2211",
   },
   Brisbane: { site: "Cooling Towers Solutions Pty Ltd", address: "1/26 Octal Street, Yatala Qld 4207" },
+  Fremantle: { site: "Elite Solutions Mechanical Group", address: "PO BOX 1015, Bibra Lake WA 6965" },
 };
 
 /** Tower fields filled from that tower type's Cooling Tower Specification. */
@@ -339,6 +340,7 @@ export function removeTowerType<T extends Pick<ProposalData, "extraSpecs" | "com
 export const PARTNERS = [
   { id: "sydney", region: "Sydney", name: "Complete Cooling Towers Service and Spares Pty Ltd" },
   { id: "queensland", region: "Queensland", name: "Cooling Tower Solutions" },
+  { id: "wa", region: "WA", name: "Elite Solutions Mechanical Group" },
 ] as const;
 
 /** "customer" copies Customer Detail, "other" uses the typed name, otherwise a partner id. */
