@@ -20,6 +20,7 @@ export type ScanFieldId =
   | "flowType"
   | "shape"
   | "ctiCertified"
+  | "towerType"
   | "casingMaterial"
   | "fillMaterial"
   | "numberOfCells"
@@ -375,6 +376,8 @@ export function parseScan(lines: Line[]): ScanResult {
   // Materials.
   const casing = find(lines, "casing");
   set("casingMaterial", casing && material(casing.value), casing);
+  // The RFQ's Tower Type is the tower's material, the same as the casing.
+  set("towerType", casing && material(casing.value), casing);
   const fill = find(lines, "fill");
   set("fillMaterial", fill && material(fill.value), fill);
 

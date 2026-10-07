@@ -21,6 +21,7 @@ export type ScanField = {
 };
 
 const SCANNED_SPEC_KEYS: readonly ScanFieldId[] = [
+  "towerType",
   "casingMaterial",
   "fillMaterial",
   "numberOfCells",
