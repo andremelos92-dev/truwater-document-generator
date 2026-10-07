@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import { Eye, FileDown, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { CommercialProposal } from "@/components/commercial-proposal";
+import { InquiryForm } from "@/components/inquiry-form";
 import { DocumentPreview, type PreviewDocument } from "@/components/document-preview";
 import { ScanDocumentButton } from "@/components/scan-document";
 import { markUnfilled, type ScanMarks } from "@/lib/scan-marks";
@@ -35,7 +36,7 @@ import { cn } from "@/lib/utils";
 
 type TextField = Exclude<
   keyof ProposalData,
-  "spec" | "extraSpecs" | "revisions" | "flowType" | "recipient" | "commercial" | "selectionSummary"
+  "spec" | "extraSpecs" | "revisions" | "flowType" | "recipient" | "commercial" | "selectionSummary" | "inquiry"
 >;
 
 const RECIPIENT_OPTIONS: { value: Recipient; label: string }[] = [
@@ -45,6 +46,14 @@ const RECIPIENT_OPTIONS: { value: Recipient; label: string }[] = [
 ];
 
 const ASAP = "ASAP";
+
+const TABS = [
+  { id: "documents", label: "RFQ & Technical Proposal" },
+  { id: "commercial", label: "Commercial Proposal" },
+  { id: "inquiry", label: "Inquiry Form" },
+] as const;
+
+type TabId = (typeof TABS)[number]["id"];
 
 function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
@@ -81,7 +90,7 @@ const CONTACT_ROWS: {
 
 export function ProposalForm() {
   const [data, setData] = useState<ProposalData>(createInitialProposal);
-  const [activeTab, setActiveTab] = useState<"documents" | "commercial">("documents");
+  const [activeTab, setActiveTab] = useState<TabId>("documents");
   const [generating, setGenerating] = useState<{ kind: DocumentKind; preview: boolean } | null>(null);
   const [preview, setPreview] = useState<PreviewDocument | null>(null);
   /** Commercial boxes the last scans didn't fill, marked until they're changed. */
@@ -90,8 +99,9 @@ export function ProposalForm() {
 
   // An entry loaded on the History page arrives here once, then is cleared.
   useEffect(() => {
-    // The dashboard links straight to the Commercial tab with ?tab=commercial.
-    if (new URLSearchParams(window.location.search).get("tab") === "commercial") setActiveTab("commercial");
+    // The dashboard links straight to a tab with ?tab=commercial or ?tab=inquiry.
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab === "commercial" || tab === "inquiry") setActiveTab(tab);
     try {
       const stored = sessionStorage.getItem(LOAD_KEY);
       if (!stored) return;
@@ -134,8 +144,8 @@ export function ProposalForm() {
 
   /** Builds the document, then downloads it or opens it in the preview (which can download it after). */
   async function handleGenerate(kind: DocumentKind, { preview = false } = {}) {
-    // The tower type starts blank so it's always chosen on purpose.
-    if (kind !== "rfq" && !data.flowType) {
+    // The tower type starts blank so it's always chosen on purpose (the Inquiry Form can go out before it is).
+    if (kind !== "rfq" && kind !== "inquiry" && !data.flowType) {
       setError("Select the Tower Type (Counterflow, Crossflow or Closed Circuit) on the RFQ & Technical Proposal tab first.");
       return;
     }
@@ -148,7 +158,8 @@ export function ProposalForm() {
     setError(null);
     try {
       const { blob, fileName } = await generateDocument(kind, data);
-      const label = kind === "commercial" ? "Commercial Proposal" : DOCUMENTS[kind].label;
+      const label =
+        kind === "commercial" ? "Commercial Proposal" : kind === "inquiry" ? "Inquiry Form" : DOCUMENTS[kind].label;
       if (preview) setPreview({ label, blob, fileName });
       else downloadBlob(blob, fileName);
     } catch (err) {
@@ -168,37 +179,34 @@ export function ProposalForm() {
   return (
     <div className="grid gap-6">
       <div className="flex border-b" role="tablist" aria-label="Document sections">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "documents"}
-          onClick={() => setActiveTab("documents")}
-          className={cn(
-            "min-w-0 flex-1 whitespace-normal border-b-2 px-2 py-3 text-center text-sm font-medium transition-colors sm:px-4",
-            activeTab === "documents"
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          RFQ &amp; Technical Proposal
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "commercial"}
-          onClick={() => setActiveTab("commercial")}
-          className={cn(
-            "min-w-0 flex-1 whitespace-normal border-b-2 px-2 py-3 text-center text-sm font-medium transition-colors sm:px-4",
-            activeTab === "commercial"
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Commercial Proposal
-        </button>
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              "min-w-0 flex-1 whitespace-normal border-b-2 px-2 py-3 text-center text-sm font-medium transition-colors sm:px-4",
+              activeTab === tab.id
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {activeTab === "commercial" ? (
+      {activeTab === "inquiry" ? (
+        <InquiryForm
+          data={data}
+          onChange={(inquiry) => setData((previous) => ({ ...previous, inquiry }))}
+          onGenerate={() => void handleGenerate("inquiry")}
+          generating={generating?.kind === "inquiry"}
+          error={error}
+        />
+      ) : activeTab === "commercial" ? (
         <CommercialProposal
           data={data}
           onChange={(updates) => setData((previous) => ({ ...previous, ...updates }))}

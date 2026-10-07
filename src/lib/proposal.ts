@@ -1,3 +1,5 @@
+import type { InquiryData } from "@/lib/inquiry";
+
 /**
  * The Cooling Tower Specification boxes on the RFQ tab, named and ordered like the Cooling Tower Bid Form
  * (General, Design & Operating Conditions, Dimension & Weight, Materials, Mechanical Equipment). The RFQ
@@ -302,6 +304,8 @@ export type ProposalData = {
   commercial: CommercialProposalData;
   /** Selection Summary details not on the forms, one per tower type (missing = defaults). */
   selectionSummary: SummaryExtra[];
+  /** Inquiry Form choices changed from their defaults (see src/lib/inquiry.ts). */
+  inquiry: InquiryData;
 };
 
 /** Selection Summary email details that aren't typed anywhere else. */
@@ -437,6 +441,7 @@ export function createInitialProposal(): ProposalData {
     revisions: [createRevision("0")],
     commercial: createInitialCommercialProposal(),
     selectionSummary: [],
+    inquiry: {},
   };
 }
 

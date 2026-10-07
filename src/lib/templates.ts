@@ -1,6 +1,8 @@
 import Docxtemplater from "docxtemplater";
 import PizZip from "pizzip";
 
+import { generateInquiry } from "@/lib/inquiry";
+
 import {
   formatDate,
   MAX_REVISIONS,
@@ -95,7 +97,7 @@ export const DOCUMENTS = {
   },
 } satisfies Record<string, DocumentTemplate>;
 
-export type DocumentKind = keyof typeof DOCUMENTS | "commercial";
+export type DocumentKind = keyof typeof DOCUMENTS | "commercial" | "inquiry";
 
 const AUD = new Intl.NumberFormat("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const NUMBER = new Intl.NumberFormat("en-AU", { maximumFractionDigits: 2 });
@@ -283,6 +285,8 @@ export async function renderTemplate(
 }
 
 export async function generateDocument(kind: DocumentKind, data: ProposalData) {
+  // The Inquiry Form is a spreadsheet, filled cell by cell.
+  if (kind === "inquiry") return generateInquiry(data);
   if (kind === "commercial") {
     return {
       blob: await renderTemplate(COMMERCIAL_TEMPLATE_URL, commercialValues(data)),
