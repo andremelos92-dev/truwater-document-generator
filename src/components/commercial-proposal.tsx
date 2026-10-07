@@ -31,14 +31,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { FileDown, Loader2 } from "lucide-react";
+import { Eye, FileDown, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 type CommercialProposalProps = {
   data: ProposalData;
   onChange: (updates: Partial<ProposalData>) => void;
   onGenerate: () => void;
-  generating: boolean;
+  onPreview: () => void;
+  /** Which action is building the document right now, if any. */
+  generating: "download" | "preview" | null;
   error: string | null;
 };
 
@@ -83,6 +85,7 @@ export function CommercialProposal({
   data,
   onChange,
   onGenerate,
+  onPreview,
   generating,
   error,
 }: CommercialProposalProps) {
@@ -446,8 +449,12 @@ export function CommercialProposal({
       <div className="grid gap-2 sm:flex sm:justify-end sm:gap-3 [&_button]:w-full sm:[&_button]:w-auto">
         <SaveToHistory data={data} kinds={["commercial"]} />
         <SelectionSummaryButton data={data} onExtrasChange={(selectionSummary) => onChange({ selectionSummary })} />
-        <Button type="button" size="lg" disabled={generating} onClick={onGenerate}>
-          {generating ? <Loader2 className="animate-spin" /> : <FileDown />}
+        <Button type="button" size="lg" variant="outline" disabled={!!generating} onClick={onPreview}>
+          {generating === "preview" ? <Loader2 className="animate-spin" /> : <Eye />}
+          Preview
+        </Button>
+        <Button type="button" size="lg" disabled={!!generating} onClick={onGenerate}>
+          {generating === "download" ? <Loader2 className="animate-spin" /> : <FileDown />}
           Generate Commercial Proposal
         </Button>
       </div>

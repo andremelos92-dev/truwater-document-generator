@@ -1,9 +1,10 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
-import { FileDown, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Eye, FileDown, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { CommercialProposal } from "@/components/commercial-proposal";
+import { DocumentPreview, type PreviewDocument } from "@/components/document-preview";
 import { SelectionSummaryButton } from "@/components/selection-summary";
 import { RevisionsEditor } from "@/components/revisions-editor";
 import { SaveToHistory } from "@/components/save-to-history";
@@ -79,7 +80,8 @@ const CONTACT_ROWS: {
 export function ProposalForm() {
   const [data, setData] = useState<ProposalData>(createInitialProposal);
   const [activeTab, setActiveTab] = useState<"documents" | "commercial">("documents");
-  const [generating, setGenerating] = useState<DocumentKind | null>(null);
+  const [generating, setGenerating] = useState<{ kind: DocumentKind; preview: boolean } | null>(null);
+  const [preview, setPreview] = useState<PreviewDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // An entry loaded on the History page arrives here once, then is cleared.
@@ -126,7 +128,8 @@ export function ProposalForm() {
     </div>
   );
 
-  async function handleGenerate(kind: DocumentKind) {
+  /** Builds the document, then downloads it or opens it in the preview (which can download it after). */
+  async function handleGenerate(kind: DocumentKind, { preview = false } = {}) {
     // The tower type starts blank so it's always chosen on purpose.
     if (kind !== "rfq" && !data.flowType) {
       setError("Select the Tower Type (Counterflow, Crossflow or Closed Circuit) on the RFQ & Technical Proposal tab first.");
@@ -137,11 +140,13 @@ export function ProposalForm() {
       setError(`Select the Type (Counterflow, Crossflow or Closed Circuit) for cooling tower ${untyped + 1}.`);
       return;
     }
-    setGenerating(kind);
+    setGenerating({ kind, preview });
     setError(null);
     try {
       const { blob, fileName } = await generateDocument(kind, data);
-      downloadBlob(blob, fileName);
+      const label = kind === "commercial" ? "Commercial Proposal" : DOCUMENTS[kind].label;
+      if (preview) setPreview({ label, blob, fileName });
+      else downloadBlob(blob, fileName);
     } catch (err) {
       console.error(err);
       setError("Something went wrong while generating the document. Please try again.");
@@ -194,7 +199,8 @@ export function ProposalForm() {
           data={data}
           onChange={(updates) => setData((previous) => ({ ...previous, ...updates }))}
           onGenerate={() => void handleGenerate("commercial")}
-          generating={generating === "commercial"}
+          onPreview={() => void handleGenerate("commercial", { preview: true })}
+          generating={generating?.kind === "commercial" ? (generating.preview ? "preview" : "download") : null}
           error={error}
         />
       ) : (
@@ -513,14 +519,33 @@ export function ProposalForm() {
           onExtrasChange={(selectionSummary) => setData((prev) => ({ ...prev, selectionSummary }))}
         />
         {(Object.keys(DOCUMENTS) as (keyof typeof DOCUMENTS)[]).map((kind) => (
-          <Button key={kind} type="submit" value={kind} size="lg" disabled={!!generating}>
-            {generating === kind ? <Loader2 className="animate-spin" /> : <FileDown />}
-            {DOCUMENTS[kind].label}
-          </Button>
+          <div key={kind} className="flex">
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              className="rounded-r-none border-r-0 px-3"
+              aria-label={`Preview ${DOCUMENTS[kind].label}`}
+              title={`Preview ${DOCUMENTS[kind].label}`}
+              disabled={!!generating}
+              onClick={() => void handleGenerate(kind, { preview: true })}
+            >
+              {generating?.kind === kind && generating.preview ? <Loader2 className="animate-spin" /> : <Eye />}
+            </Button>
+            <Button type="submit" value={kind} size="lg" className="rounded-l-none" disabled={!!generating}>
+              {generating?.kind === kind && !generating.preview ? <Loader2 className="animate-spin" /> : <FileDown />}
+              {DOCUMENTS[kind].label}
+            </Button>
+          </div>
         ))}
       </div>
       </form>
       )}
+      <DocumentPreview
+        document={preview}
+        onDownload={(doc) => downloadBlob(doc.blob, doc.fileName)}
+        onClose={() => setPreview(null)}
+      />
     </div>
   );
 }
