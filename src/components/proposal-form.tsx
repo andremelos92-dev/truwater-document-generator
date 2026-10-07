@@ -389,8 +389,11 @@ export function ProposalForm() {
                   </div>
                 );
               })()}
-              {/* Fills down the left column first, so the order matches the RFQ table. */}
-              <div className="grid gap-x-8 gap-y-2 sm:grid-flow-col sm:grid-cols-2 sm:grid-rows-8">
+              {/* Fills down the left column first, so the order matches the RFQ table. Rows = half the fields. */}
+              <div
+                className="grid gap-x-8 gap-y-2 sm:grid-flow-col sm:grid-cols-2 sm:grid-rows-[repeat(var(--spec-rows),auto)]"
+                style={{ "--spec-rows": Math.ceil(SPEC_ROWS.length / 2) } as React.CSSProperties}
+              >
                 {SPEC_ROWS.map((row) => {
                   const id = index === 0 ? row.key : `${row.key}-${index + 1}`;
                   return (

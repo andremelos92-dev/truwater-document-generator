@@ -117,10 +117,10 @@ export function buildSelectionSummary(data: ProposalData, attach: SummaryAttachm
       ["Wet Bulb Temperature", withUnit(spec.wetBulbTemp, "°C"), true],
       ["Heat Rejection", withUnit(spec.kwCapacity, "kW/unit"), true],
       ["Number of Cells", spec.numberOfCells.trim(), true],
-      ["No. of Air Intake", extra.airIntakes.trim(), false],
+      ["No. of Air Intake", spec.airIntakes.trim(), true],
       ["Motor", formatMotor(spec.noOfFans, spec.fanKw), true],
       ["Dimensions", formatDimensions(spec.dimensions), true],
-      ["Approx. Dry Weight", withUnit(extra.dryWeight, "kg"), false],
+      ["Approx. Dry Weight", withUnit(spec.dryWeight, "kg"), true],
       ["Approx. Operating Weight", withUnit(spec.designOperatingWeight, "kg"), true],
     ];
     const missing = [
@@ -132,7 +132,7 @@ export function buildSelectionSummary(data: ProposalData, attach: SummaryAttachm
     return {
       heading,
       description,
-      // Optional rows (air intakes, dry weight) are left out until they're filled in.
+      // Blank rows are left out of the email (and listed as missing).
       rows: rows.filter(([, value]) => value).map(([label, value]) => [label, value]),
       missing,
     };

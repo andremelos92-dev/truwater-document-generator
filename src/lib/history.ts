@@ -1,4 +1,4 @@
-import { createInitialProposal, projectTitle, type ProposalData } from "@/lib/proposal";
+import { createEmptySpec, createInitialProposal, projectTitle, type ProposalData } from "@/lib/proposal";
 
 /** The three History tabs. */
 export const HISTORY_KINDS = [
@@ -33,7 +33,7 @@ export function restoreProposal(saved: Partial<ProposalData>): ProposalData {
     ...initial,
     ...saved,
     spec: { ...initial.spec, ...saved.spec },
-    extraSpecs: saved.extraSpecs ?? initial.extraSpecs,
+    extraSpecs: (saved.extraSpecs ?? initial.extraSpecs).map((spec) => ({ ...createEmptySpec(), ...spec })),
     commercial: { ...initial.commercial, ...saved.commercial },
   };
 }

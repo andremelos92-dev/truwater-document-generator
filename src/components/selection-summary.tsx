@@ -13,7 +13,6 @@ import {
   type SummaryAttachments,
 } from "@/lib/selection-summary";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 
@@ -159,7 +158,7 @@ export function SelectionSummaryButton({ data, onExtrasChange, className }: Sele
                   return (
                     <div
                       key={index}
-                      className="grid grid-cols-2 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_8.5rem_7rem_7rem_auto]"
+                      className="grid grid-cols-2 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_8.5rem_auto]"
                     >
                       <p className="col-span-2 truncate text-sm font-medium sm:col-span-1">
                         {tower.model || `Tower type ${index + 1}`}
@@ -177,22 +176,6 @@ export function SelectionSummaryButton({ data, onExtrasChange, className }: Sele
                           </option>
                         ))}
                       </NativeSelect>
-                      <Input
-                        aria-label="No. of air intakes"
-                        placeholder="Air intakes"
-                        inputMode="numeric"
-                        className="h-8 md:text-sm"
-                        value={extra.airIntakes}
-                        onChange={(event) => setExtra(index, { airIntakes: event.target.value })}
-                      />
-                      <Input
-                        aria-label="Approx. dry weight (kg)"
-                        placeholder="Dry wt kg"
-                        inputMode="decimal"
-                        className="h-8 md:text-sm"
-                        value={extra.dryWeight}
-                        onChange={(event) => setExtra(index, { dryWeight: event.target.value })}
-                      />
                       <label className="flex h-8 items-center gap-2 text-sm whitespace-nowrap">
                         <input
                           type="checkbox"

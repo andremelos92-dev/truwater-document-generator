@@ -4,6 +4,7 @@ export const SPEC_ROWS = [
   { key: "casingMaterial", label: "Casing Material", unit: "", example: "e.g. FRP, SS304, SS316" },
   { key: "fillMaterial", label: "Fill Material", unit: "", example: "e.g. PVC" },
   { key: "numberOfCells", label: "Number Of Cells", unit: "#", example: "e.g. 1" },
+  { key: "airIntakes", label: "No. of Air Intake", unit: "#", example: "e.g. 2" },
   { key: "kwCapacity", label: "kW Capacity", unit: "kW", example: "e.g. 1,680" },
   { key: "condenserFlowRate", label: "Condenser Flow Rate", unit: "L/s", example: "e.g. 73" },
   { key: "condInTemp", label: "Cond. In Temp", unit: "°C", example: "e.g. 35" },
@@ -13,7 +14,8 @@ export const SPEC_ROWS = [
   { key: "fanKw", label: "Fan kW", unit: "kW", example: "e.g. 11" },
   { key: "fanDriveType", label: "Fan Drive Type", unit: "", example: "e.g. Direct, Belt" },
   { key: "dimensions", label: "Dimensions", unit: "mm", example: "e.g. 3499 x 3499" },
-  { key: "designOperatingWeight", label: "Design Operating Weight", unit: "kg", example: "e.g. 5,700" },
+  { key: "dryWeight", label: "Approx. Dry Weight", unit: "kg", example: "e.g. 2,100" },
+  { key: "designOperatingWeight", label: "Approx. Operating Weight", unit: "kg", example: "e.g. 5,700" },
 ] as const;
 
 export type SpecKey = (typeof SPEC_ROWS)[number]["key"];
@@ -296,12 +298,10 @@ export type ProposalData = {
 export type SummaryExtra = {
   /** Blank = worked out from the dimensions (equal length and width = Square). */
   shape: string;
-  airIntakes: string;
-  dryWeight: string;
   ctiCertified: boolean;
 };
 
-export const EMPTY_SUMMARY_EXTRA: SummaryExtra = { shape: "", airIntakes: "", dryWeight: "", ctiCertified: true };
+export const EMPTY_SUMMARY_EXTRA: SummaryExtra = { shape: "", ctiCertified: true };
 
 type TowerSource = Pick<ProposalData, "commercial" | "towerModel" | "flowType" | "spec" | "extraSpecs">;
 
