@@ -1,21 +1,31 @@
+/**
+ * The Cooling Tower Specification boxes on the RFQ tab, named and ordered like the Cooling Tower Bid Form
+ * (General, Design & Operating Conditions, Dimension & Weight, Materials, Mechanical Equipment). The RFQ
+ * document's table keeps its own wording and order; it reads each value by key.
+ */
 export const SPEC_ROWS = [
   { key: "customerRequires", label: "Customer Requires", unit: "#", example: "e.g. 8" },
-  { key: "towerType", label: "Tower Type", unit: "", example: "e.g. FRP, SS304, SS316" },
-  { key: "casingMaterial", label: "Casing Material", unit: "", example: "e.g. FRP, SS304, SS316" },
-  { key: "fillMaterial", label: "Fill Material", unit: "", example: "e.g. PVC" },
-  { key: "numberOfCells", label: "Number Of Cells", unit: "#", example: "e.g. 1" },
+  // General
+  { key: "kwCapacity", label: "Heat Load Rejection", unit: "kW", example: "e.g. 1,680" },
+  { key: "numberOfCells", label: "No of Cells", unit: "#", example: "e.g. 1" },
   { key: "airIntakes", label: "No. of Air Intake", unit: "#", example: "e.g. 2" },
-  { key: "kwCapacity", label: "kW Capacity", unit: "kW", example: "e.g. 1,680" },
-  { key: "condenserFlowRate", label: "Condenser Flow Rate", unit: "L/s", example: "e.g. 73" },
-  { key: "condInTemp", label: "Cond. In Temp", unit: "°C", example: "e.g. 35" },
-  { key: "condOutTemp", label: "Cond. Out Temp", unit: "°C", example: "e.g. 29.5" },
-  { key: "wetBulbTemp", label: "Wet Bulb Temp", unit: "°C", example: "e.g. 23" },
-  { key: "noOfFans", label: "No Of Fans", unit: "#", example: "e.g. 1 per tower" },
-  { key: "fanKw", label: "Fan kW", unit: "kW", example: "e.g. 11" },
-  { key: "fanDriveType", label: "Fan Drive Type", unit: "", example: "e.g. Direct, Belt" },
-  { key: "dimensions", label: "Dimensions", unit: "mm", example: "e.g. 3499 x 3499" },
-  { key: "dryWeight", label: "Approx. Dry Weight", unit: "kg", example: "e.g. 2,100" },
-  { key: "designOperatingWeight", label: "Approx. Operating Weight", unit: "kg", example: "e.g. 5,700" },
+  // Design & Operating Conditions
+  { key: "condenserFlowRate", label: "Circulating Water Flow", unit: "L/s", example: "e.g. 73" },
+  { key: "condInTemp", label: "Hot (Inlet) Water Temperature", unit: "°C", example: "e.g. 35" },
+  { key: "condOutTemp", label: "Cold (Outlet) Water Temperature", unit: "°C", example: "e.g. 29.5" },
+  { key: "wetBulbTemp", label: "Wet Bulb Temperature", unit: "°C", example: "e.g. 23" },
+  // Dimension & Weight
+  { key: "dimensions", label: "Dimensions (L x W x H)", unit: "mm", example: "e.g. 3499 x 3499" },
+  { key: "dryWeight", label: "Approximate Dry Weight", unit: "kg", example: "e.g. 2,100" },
+  { key: "designOperatingWeight", label: "Approximate Operating Weight", unit: "kg", example: "e.g. 5,700" },
+  // Materials of Construction (Tower Type is the tower's material, as typed on the RFQ)
+  { key: "towerType", label: "Tower Type", unit: "", example: "e.g. FRP, SS304, SS316" },
+  { key: "casingMaterial", label: "Casing", unit: "", example: "e.g. FRP, SS304, SS316" },
+  { key: "fillMaterial", label: "Fill Media", unit: "", example: "e.g. PVC" },
+  // Mechanical Equipment
+  { key: "noOfFans", label: "Fan Quantity", unit: "#", example: "e.g. 1 per tower" },
+  { key: "fanKw", label: "Rated kW per Cell", unit: "kW", example: "e.g. 11" },
+  { key: "fanDriveType", label: "Type of Drive", unit: "", example: "e.g. Direct, Belt" },
 ] as const;
 
 export type SpecKey = (typeof SPEC_ROWS)[number]["key"];

@@ -12,6 +12,7 @@ import {
   towerSpecKey,
   towerTotal,
   type CommercialProposalData,
+  type CommercialScopeItem,
   type SignatoryId,
   type CommercialTower,
   type ProposalData,
@@ -47,6 +48,37 @@ type CommercialProposalProps = {
   scanMarks: ScanMarks | null;
   onClearScanMarks: () => void;
 };
+
+/**
+ * Truwater scope items in the Cooling Tower Bid Form's order (Materials of Construction, then Mechanical
+ * Equipment), so they can be checked line by line against it. Only the screen order: the document prints them
+ * in their stored order. Items not on the bid form (Mechanical, spares, tools) keep their place after them.
+ */
+const BID_FORM_SCOPE_ORDER = [
+  /^frameworks?$/i, // Framework Members
+  /^film fill/i, // Fill Media
+  /^drift eliminator/i, // Drift Eliminator
+  /^fan cylinder/i, // Fan Cylinder
+  /^spray nozzle/i, // Water Distribution System
+  /^bolt(?!.*non-wetted).*wetted/i, // Bolts, Nuts & Washers
+  /^bolt.*non-wetted/i,
+  /^cold water basin support/i, // Cold Water Basin Supporting Framework
+  /^mechanical/i,
+  /^fan blade/i, // Fan: Blade Material
+  /\bphase\b/i, // Motor: Electric Characteristics
+  /drive system$/i, // Type of Drive
+];
+
+function bidFormScopeOrder(scope: CommercialScopeItem[]) {
+  const rank = (item: CommercialScopeItem) => {
+    const at = BID_FORM_SCOPE_ORDER.findIndex((match) => match.test(item.description.trim()));
+    return at < 0 ? BID_FORM_SCOPE_ORDER.length : at;
+  };
+  return scope
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.responsibility === "Truwater")
+    .sort((a, b) => rank(a.item) - rank(b.item) || a.index - b.index);
+}
 
 /** Outline for a box a scan didn't fill. */
 const MARKED = "border-amber-500 bg-amber-50 ring-2 ring-amber-400/40 dark:bg-amber-500/10";
@@ -118,6 +150,7 @@ export function CommercialProposal({
     value: CommercialProposalData[K]
   ) => updateCommercial({ ...data.commercial, [key]: value });
   const towers = resolvedCommercialTowers(data);
+  const scopeRows = bidFormScopeOrder(data.commercial.scope);
   const port = towers[0]?.port.trim() ?? "";
   const delivery = PORT_DELIVERY[port];
 
@@ -378,9 +411,16 @@ export function CommercialProposal({
             standard.
           </CardDescription>
         </CardHeader>
-        <CardContent className={cn(PAD, "grid gap-x-3 gap-y-1.5 sm:grid-cols-2")}>
+        {/* Fills down the left column first, in bid form order, so it reads like the scanned document. */}
+        <CardContent
+          className={cn(
+            PAD,
+            "grid gap-x-3 gap-y-1.5 sm:grid-flow-col sm:grid-cols-2 sm:grid-rows-[repeat(var(--scope-rows),auto)]"
+          )}
+          style={{ "--scope-rows": Math.ceil(scopeRows.length / 2) } as React.CSSProperties}
+        >
           {/* Material and description are joined into one control. */}
-          {data.commercial.scope.map((item, index) =>
+          {scopeRows.map(({ item, index }) =>
             item.responsibility === "Truwater" ? (
               <div
                 key={index}

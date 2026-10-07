@@ -55,7 +55,7 @@ function boxForField(data: ProposalData, id: ScanFieldId, index: number): string
   if (id === "flowType" || id === "equipment" || id === "basin") return towerBox(index, id);
   const scope = scopeIndex(data, id);
   if (scope >= 0) return scopeBox(scope);
-  // Spec fields reach the tower boxes linked to them ("Number Of Cells" -> "No. Of Cells").
+  // Spec fields reach the tower boxes linked to them ("No of Cells" -> "No. Of Cells").
   const field = TOWER_BOXES.find((f) => towerSpecKey(f) === id);
   return field ? towerBox(index, field) : null;
 }

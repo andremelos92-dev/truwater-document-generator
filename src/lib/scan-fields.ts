@@ -85,17 +85,18 @@ export const SCAN_FIELDS: ScanField[] = [
   { id: "basin", label: "Cold Water Basin (Commercial)", group: "tower" },
   { id: "shape", label: "Shape (Selection Summary)", group: "tower", options: ["Square", "Rectangular", "Round"] },
   { id: "ctiCertified", label: "CTI Certified (Selection Summary)", group: "tower", options: ["Yes", "No"] },
+  // Bid form order, as on the Commercial tab.
   { id: "scopeFramework", label: "Frameworks", group: "scope" },
-  { id: "scopeBasinSupport", label: "Cold Water Basin Supporting Framework", group: "scope" },
-  { id: "scopeBoltsWetted", label: "Bolt & Nut & Hardware’s Wetted Parts", group: "scope" },
-  { id: "scopeBoltsNonWetted", label: "Bolt & Nut & Hardware’s Non-wetted Parts", group: "scope" },
-  { id: "scopeNozzle", label: "Spray nozzle", group: "scope" },
   { id: "scopeFill", label: "Film Fill", group: "scope" },
   { id: "scopeDrift", label: "Drift Eliminators", group: "scope" },
   { id: "scopeFanCylinder", label: "Fan Cylinders", group: "scope" },
+  { id: "scopeNozzle", label: "Spray nozzle", group: "scope" },
+  { id: "scopeBoltsWetted", label: "Bolt & Nut & Hardware’s Wetted Parts", group: "scope" },
+  { id: "scopeBoltsNonWetted", label: "Bolt & Nut & Hardware’s Non-wetted Parts", group: "scope" },
+  { id: "scopeBasinSupport", label: "Cold Water Basin Supporting Framework", group: "scope" },
   { id: "scopeFanBlades", label: "Fan Blades", group: "scope" },
-  { id: "scopeDrive", label: "Drive line", group: "scope" },
   { id: "scopeMotor", label: "Motor line", group: "scope" },
+  { id: "scopeDrive", label: "Drive line", group: "scope" },
 ];
 
 /** What the form holds now for a field, for tower type `index`. */
