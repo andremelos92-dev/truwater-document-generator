@@ -5,6 +5,7 @@ import { Eye, FileDown, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { CommercialProposal } from "@/components/commercial-proposal";
 import { DocumentPreview, type PreviewDocument } from "@/components/document-preview";
+import { ScanDocumentButton } from "@/components/scan-document";
 import { SelectionSummaryButton } from "@/components/selection-summary";
 import { RevisionsEditor } from "@/components/revisions-editor";
 import { SaveToHistory } from "@/components/save-to-history";
@@ -206,9 +207,12 @@ export function ProposalForm() {
       ) : (
       <form onSubmit={handleSubmit} className="grid gap-6">
       <Card>
-        <CardHeader>
+        <CardHeader className="grid-cols-[minmax(0,1fr)_auto]">
           <CardTitle>Project Details</CardTitle>
-          <CardDescription>Used by both the RFQ and the Technical Proposal.</CardDescription>
+          <CardDescription className="col-start-1">Used by both the RFQ and the Technical Proposal.</CardDescription>
+          <div className="col-start-2 row-span-2 row-start-1 self-start">
+            <ScanDocumentButton data={data} onApply={(update) => setData(update)} />
+          </div>
         </CardHeader>
         <CardContent className="grid gap-5">
           <div className="grid gap-3 sm:grid-cols-12">
