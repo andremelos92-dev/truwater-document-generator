@@ -6,7 +6,7 @@ import { Check, Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
 import { HISTORY_KINDS, type HistoryKind } from "@/lib/history";
-import { getSavedPassword, historyApi, savePassword, WrongPasswordError } from "@/lib/history-client";
+import { historyApi } from "@/lib/history-client";
 import type { ProposalData } from "@/lib/proposal";
 
 // Saving to History is switched off while the tool is being tested; set to true to turn it back on.
@@ -30,17 +30,14 @@ function SaveToHistoryControls({ data, kinds }: SaveToHistoryProps) {
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
-    const password = getSavedPassword() ?? window.prompt("History password")?.trim();
-    if (!password) return;
     setState("saving");
     setError(null);
     try {
-      await historyApi.save(kind, data, password);
-      savePassword(password);
+      await historyApi.save(kind, data);
       setState("saved");
       setTimeout(() => setState("idle"), 2500);
-    } catch (err) {
-      setError(err instanceof WrongPasswordError ? "Wrong History password." : "Could not save. Please try again.");
+    } catch {
+      setError("Could not save. Please try again.");
       setState("idle");
     }
   }

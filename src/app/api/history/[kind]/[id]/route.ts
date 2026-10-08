@@ -1,7 +1,7 @@
 import { del, get } from "@vercel/blob";
 
 import { isHistoryKind } from "@/lib/history";
-import { entryPath, isAuthorized, isSafeId, unauthorized } from "@/lib/history-server";
+import { entryPath, isSafeId } from "@/lib/history-server";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +12,7 @@ function badRequest() {
 }
 
 /** GET /api/history/<kind>/<id> – the saved form data. */
-export async function GET(request: Request, { params }: Params) {
-  if (!isAuthorized(request)) return unauthorized();
+export async function GET(_request: Request, { params }: Params) {
   const { kind, id } = await params;
   if (!isHistoryKind(kind) || !isSafeId(id)) return badRequest();
 
@@ -24,8 +23,7 @@ export async function GET(request: Request, { params }: Params) {
 }
 
 /** DELETE /api/history/<kind>/<id> */
-export async function DELETE(request: Request, { params }: Params) {
-  if (!isAuthorized(request)) return unauthorized();
+export async function DELETE(_request: Request, { params }: Params) {
   const { kind, id } = await params;
   if (!isHistoryKind(kind) || !isSafeId(id)) return badRequest();
 

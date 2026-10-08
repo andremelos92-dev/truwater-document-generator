@@ -1,14 +1,13 @@
 import { list, put } from "@vercel/blob";
 
 import { historyTitle, isHistoryKind, restoreProposal, type HistoryEntry } from "@/lib/history";
-import { decodeTitle, encodeTitle, entryPath, isAuthorized, unauthorized } from "@/lib/history-server";
+import { decodeTitle, encodeTitle, entryPath } from "@/lib/history-server";
 import type { ProposalData } from "@/lib/proposal";
 
 export const dynamic = "force-dynamic";
 
 /** GET /api/history?kind=rfq – the saved entries of one tab, newest first. */
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) return unauthorized();
   const kind = new URL(request.url).searchParams.get("kind");
   if (!isHistoryKind(kind)) return Response.json({ error: "Unknown kind." }, { status: 400 });
 
@@ -30,7 +29,6 @@ export async function GET(request: Request) {
 
 /** POST /api/history – body { kind, data }: saves the whole form under that tab. */
 export async function POST(request: Request) {
-  if (!isAuthorized(request)) return unauthorized();
   const body = (await request.json().catch(() => null)) as { kind?: unknown; data?: ProposalData } | null;
   if (!body || !isHistoryKind(body.kind) || typeof body.data !== "object" || body.data === null) {
     return Response.json({ error: "Nothing to save." }, { status: 400 });

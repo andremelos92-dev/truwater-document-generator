@@ -2,66 +2,42 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FolderOpen, Loader2, Lock, Trash2 } from "lucide-react";
+import { FolderOpen, Loader2, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { HISTORY_KINDS, LOAD_KEY, type HistoryEntry, type HistoryKind } from "@/lib/history";
-import { getSavedPassword, historyApi, savePassword, WrongPasswordError } from "@/lib/history-client";
+import { historyApi } from "@/lib/history-client";
 import { cn } from "@/lib/utils";
 
 const dateFormat = new Intl.DateTimeFormat("en-AU", { dateStyle: "medium", timeStyle: "short" });
 
 export function HistoryBrowser() {
   const router = useRouter();
-  const [password, setPassword] = useState<string | null>(null);
-  const [typed, setTyped] = useState("");
   const [kind, setKind] = useState<HistoryKind>("rfq");
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => setPassword(getSavedPassword()), []);
-
-  const refresh = useCallback(async (pw: string, tab: HistoryKind) => {
+  const refresh = useCallback(async (tab: HistoryKind) => {
     setEntries(null);
     setError(null);
     try {
-      setEntries(await historyApi.list(tab, pw));
+      setEntries(await historyApi.list(tab));
     } catch (err) {
-      if (err instanceof WrongPasswordError) setPassword(null);
       setError(err instanceof Error ? err.message : "Could not load History.");
       setEntries([]);
     }
   }, []);
 
   useEffect(() => {
-    if (password) void refresh(password, kind);
-  }, [password, kind, refresh]);
-
-  async function unlock(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy("unlock");
-    setError(null);
-    try {
-      await historyApi.list("rfq", typed);
-      savePassword(typed);
-      setPassword(typed);
-      setTyped("");
-    } catch (err) {
-      setError(err instanceof WrongPasswordError ? "Wrong password." : "Could not reach History.");
-    } finally {
-      setBusy(null);
-    }
-  }
+    void refresh(kind);
+  }, [kind, refresh]);
 
   async function load(entry: HistoryEntry) {
-    if (!password) return;
     setBusy(entry.id);
     try {
-      const data = await historyApi.load(entry.kind, entry.id, password);
+      const data = await historyApi.load(entry.kind, entry.id);
       sessionStorage.setItem(LOAD_KEY, JSON.stringify({ kind: entry.kind, data }));
       router.push("/documents");
     } catch (err) {
@@ -71,45 +47,16 @@ export function HistoryBrowser() {
   }
 
   async function remove(entry: HistoryEntry) {
-    if (!password || !window.confirm(`Delete "${entry.title}"? This can't be undone.`)) return;
+    if (!window.confirm(`Delete "${entry.title}"? This can't be undone.`)) return;
     setBusy(entry.id);
     try {
-      await historyApi.remove(entry.kind, entry.id, password);
+      await historyApi.remove(entry.kind, entry.id);
       setEntries((prev) => prev?.filter((e) => e.id !== entry.id) ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete that entry.");
     } finally {
       setBusy(null);
     }
-  }
-
-  if (!password) {
-    return (
-      <Card className="max-w-md">
-        <CardContent>
-          <form onSubmit={unlock} className="grid gap-3">
-            <div className="flex items-center gap-2 font-semibold">
-              <Lock className="size-4" /> History is password protected
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="history-password">Password</Label>
-              <Input
-                id="history-password"
-                type="password"
-                autoComplete="current-password"
-                value={typed}
-                onChange={(event) => setTyped(event.target.value)}
-                autoFocus
-              />
-            </div>
-            {error && <p className="text-destructive text-sm">{error}</p>}
-            <Button type="submit" disabled={!typed || busy === "unlock"}>
-              {busy === "unlock" && <Loader2 className="animate-spin" />} Open History
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    );
   }
 
   return (

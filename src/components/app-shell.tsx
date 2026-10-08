@@ -25,7 +25,7 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Documents", href: "/documents", icon: FileText },
   { label: "History", href: "/history", icon: History },
   { label: "Account", href: "/account", icon: UserRound, comingSoon: true },
@@ -97,6 +97,10 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 /** Dark sidebar navigation on desktop; a top bar with a slide-out menu on small screens. */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const pathname = usePathname();
+
+  // The front (login) page has its own header and no navigation.
+  if (pathname === "/") return <>{children}</>;
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
