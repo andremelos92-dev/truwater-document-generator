@@ -99,7 +99,8 @@ export function InquiryForm({ data, onChange, onGenerate, generating, error }: I
             id={id}
             className={small}
             value={value}
-            placeholder={f.placeholder}
+            // Left blank, it follows the RFQ (e.g. the existing tower's dimensions).
+            placeholder={auto ? `From RFQ: ${auto}` : f.placeholder}
             onChange={(event) => set(f.key, event.target.value)}
           />
         )}

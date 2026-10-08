@@ -117,7 +117,7 @@ export const INQUIRY_FIELDS: InquiryField[] = [
     notePlaceholder: "e.g. Australia",
     section: "inquiry",
   },
-  { key: "salesInCharge", label: "Sales in-charge", cell: "B19", placeholder: "e.g. Craig Alcorn", section: "inquiry" },
+  { key: "salesInCharge", label: "Sales in-charge", cell: "B19", options: ["Craig Alcorn", "Andre Santos"], section: "inquiry" },
   {
     key: "performance",
     label: "Cooling Tower Performance",
@@ -262,6 +262,7 @@ const FLOW_TO_CT_TYPE: Record<FlowType, string> = {
 /** Fields that follow the RFQ while left blank. */
 export function autoInquiryValue(data: ProposalData, key: InquiryKey): string {
   if (key === "coolingTowerType" || key === "newType") return data.flowType ? FLOW_TO_CT_TYPE[data.flowType] : "";
+  if (key === "existingDimensions") return data.spec.dimensions.trim();
   if (key === "structureMaterial") {
     const material = (data.spec.towerType.trim() || data.spec.casingMaterial.trim()).toUpperCase();
     if (!material) return "";
