@@ -8,12 +8,14 @@ import {
   FileText,
   History,
   LayoutDashboard,
+  LogOut,
   Menu,
   UserRound,
   X,
   type LucideIcon,
 } from "lucide-react";
 
+import { logOut } from "@/components/account-panel";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -28,7 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Documents", href: "/documents", icon: FileText },
   { label: "History", href: "/history", icon: History },
-  { label: "Account", href: "/account", icon: UserRound, comingSoon: true },
+  { label: "Account", href: "/account", icon: UserRound },
 ];
 
 function Logo() {
@@ -94,6 +96,19 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+function LogOutButton() {
+  return (
+    <button
+      type="button"
+      onClick={() => void logOut()}
+      className="flex w-full items-center gap-3 rounded-md py-2.5 pr-3 pl-4 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
+    >
+      <LogOut className="size-4 text-sky-400" />
+      Log out
+    </button>
+  );
+}
+
 /** Dark sidebar navigation on desktop; a top bar with a slide-out menu on small screens. */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -111,6 +126,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <div className="flex-1 overflow-y-auto py-4">
           <NavLinks />
+        </div>
+        <div className="border-t border-white/10 p-3">
+          <LogOutButton />
         </div>
       </aside>
 
@@ -137,6 +155,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           />
           <div className="relative bg-[#1f2226] py-3 shadow-lg">
             <NavLinks onNavigate={() => setMenuOpen(false)} />
+            <div className="mt-2 border-t border-white/10 px-3 pt-2">
+              <LogOutButton />
+            </div>
           </div>
         </div>
       )}
