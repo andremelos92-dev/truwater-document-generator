@@ -26,6 +26,8 @@ export type InquiryField = {
   notePlaceholder?: string;
   placeholder?: string;
   multiline?: boolean;
+  /** Small box, three to a row (Yes/No choices, names). */
+  short?: boolean;
   section: "inquiry" | "replacement";
 };
 
@@ -150,13 +152,27 @@ export const INQUIRY_FIELDS: InquiryField[] = [
   { key: "cellsChoice", label: "Number of Cell", cell: "B25", options: ["AE to decide", "Please specify"], section: "inquiry" },
   { key: "deliveryTerm", label: "Delivery Term", cell: "B29", placeholder: "e.g. C&F Brisbane Port", section: "inquiry" },
   { key: "warranty", label: "Warranty Period", cell: "B30", multiline: true, section: "inquiry" },
-  { key: "specialTools", label: "Special Tools", cell: "B31", options: YES_NO_OPTIONAL, section: "inquiry" },
-  { key: "commissioningSpares", label: "Commissioning Spare Parts", cell: "B32", options: YES_NO_OPTIONAL, section: "inquiry" },
-  { key: "operationSpares", label: "2 Years Operation Spare Parts", cell: "B33", options: YES_NO_OPTIONAL, section: "inquiry" },
-  { key: "otherRemarks", label: "Other Remarks", cell: "B35", multiline: true, section: "inquiry" },
-  { key: "competitor1", label: "Identified Competitor 1", cell: "B36", section: "inquiry" },
-  { key: "competitor2", label: "Identified Competitor 2", cell: "B37", section: "inquiry" },
-  { key: "competitor3", label: "Identified Competitor 3", cell: "B38", section: "inquiry" },
+  { key: "specialTools", label: "Special Tools", cell: "B31", options: YES_NO_OPTIONAL, short: true, section: "inquiry" },
+  {
+    key: "commissioningSpares",
+    label: "Commissioning Spare Parts",
+    cell: "B32",
+    options: YES_NO_OPTIONAL,
+    short: true,
+    section: "inquiry",
+  },
+  {
+    key: "operationSpares",
+    label: "2 Years Operation Spare Parts",
+    cell: "B33",
+    options: YES_NO_OPTIONAL,
+    short: true,
+    section: "inquiry",
+  },
+  { key: "otherRemarks", label: "Other Remarks", cell: "B35", multiline: true, short: true, section: "inquiry" },
+  { key: "competitor1", label: "Identified Competitor 1", cell: "B36", short: true, section: "inquiry" },
+  { key: "competitor2", label: "Identified Competitor 2", cell: "B37", short: true, section: "inquiry" },
+  { key: "competitor3", label: "Identified Competitor 3", cell: "B38", short: true, section: "inquiry" },
   {
     key: "spaceAvailability",
     label: "Space Availability at Site (L x W x H mm, height constraints)",

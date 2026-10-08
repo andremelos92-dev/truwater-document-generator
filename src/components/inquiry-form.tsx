@@ -59,13 +59,24 @@ export function InquiryForm({ data, onChange, onGenerate, generating, error }: I
     const value = inquiryInput(data, f.key);
     const auto = autoInquiryValue(data, f.key);
     const showNote = !!f.noteCell && (ALWAYS_NOTE.has(f.key) || OTHERS.test(value || auto));
+    // Short boxes: compact, three to a row and only as wide as their content (the remarks box keeps the row);
+    // long text spans the row; the rest two to a row.
+    const small = f.short ? "h-7 py-0 text-xs md:text-xs" : undefined;
     return (
-      <div key={f.key} className={cn("grid content-start gap-1.5", f.multiline && "sm:col-span-2")}>
-        <Label htmlFor={id} className="leading-snug">
+      <div
+        key={f.key}
+        className={cn(
+          "grid content-start",
+          f.short ? "gap-1" : "gap-1.5",
+          f.short && !f.multiline && "justify-items-start",
+          f.multiline ? "sm:col-span-6" : f.short ? "sm:col-span-2" : "sm:col-span-3"
+        )}
+      >
+        <Label htmlFor={id} className={cn("leading-snug", f.short && "text-xs")}>
           {f.label}
         </Label>
         {f.options ? (
-          <NativeSelect id={id} value={value} onChange={(event) => set(f.key, event.target.value)}>
+          <NativeSelect id={id} className={small} value={value} onChange={(event) => set(f.key, event.target.value)}>
             {/* Blank: Cooling Tower Type and Structure Material follow the RFQ; others are left empty. */}
             <option value="">{auto ? `From RFQ: ${auto}` : "—"}</option>
             {f.options.map((option) => (
@@ -75,9 +86,22 @@ export function InquiryForm({ data, onChange, onGenerate, generating, error }: I
             ))}
           </NativeSelect>
         ) : f.multiline ? (
-          <Textarea id={id} rows={2} value={value} placeholder={f.placeholder} onChange={(event) => set(f.key, event.target.value)} />
+          <Textarea
+            id={id}
+            rows={f.short ? 1 : 2}
+            className={cn(f.short && "min-h-7 py-1 text-xs md:text-xs")}
+            value={value}
+            placeholder={f.placeholder}
+            onChange={(event) => set(f.key, event.target.value)}
+          />
         ) : (
-          <Input id={id} value={value} placeholder={f.placeholder} onChange={(event) => set(f.key, event.target.value)} />
+          <Input
+            id={id}
+            className={small}
+            value={value}
+            placeholder={f.placeholder}
+            onChange={(event) => set(f.key, event.target.value)}
+          />
         )}
         {showNote && (
           <Input
@@ -129,7 +153,7 @@ export function InquiryForm({ data, onChange, onGenerate, generating, error }: I
             Choices from the spreadsheet&apos;s drop-down lists. “Others” opens a box for the details.
           </CardDescription>
         </CardHeader>
-        <CardContent className={cn(PAD, "grid gap-4 sm:grid-cols-2")}>
+        <CardContent className={cn(PAD, "grid gap-4 sm:grid-cols-6")}>
           {INQUIRY_FIELDS.filter((f) => f.section === "inquiry").map(field)}
         </CardContent>
       </Card>
@@ -139,7 +163,7 @@ export function InquiryForm({ data, onChange, onGenerate, generating, error }: I
           <CardTitle>Replacement CT Inquiry Form</CardTitle>
           <CardDescription>Only needed if the project is for a replacement cooling tower.</CardDescription>
         </CardHeader>
-        <CardContent className={cn(PAD, "grid gap-4 sm:grid-cols-2")}>
+        <CardContent className={cn(PAD, "grid gap-4 sm:grid-cols-6")}>
           {INQUIRY_FIELDS.filter((f) => f.section === "replacement").map(field)}
         </CardContent>
       </Card>
