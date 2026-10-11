@@ -397,8 +397,8 @@ export function parseScan(lines: Line[]): ScanResult {
   set("fanKw", fanKw && number(fanKw.value), fanKw);
   const drive = find(lines, "drive");
   if (drive) {
-    const kind = /belt/i.test(drive.value) ? "Belt" : /direct/i.test(drive.value) ? "Direct" : /gear/i.test(drive.value) ? "Gear" : drive.value;
-    set("fanDriveType", kind, drive);
+    // Exactly as written on the document, e.g. "Belt & Pulley".
+    set("fanDriveType", drive.value, drive);
     // Scope of Supply line: "Belt & Pulley" -> "Belt & Pulley Drive System", "Direct Drive" -> "Direct Drive System".
     set("scopeDrive", `${drive.value.replace(/\s*drive\s*$/i, "")} Drive System`, drive);
   }
