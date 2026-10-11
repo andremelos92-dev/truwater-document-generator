@@ -14,6 +14,7 @@ import {
   SIGNATORIES,
   towerFlowType,
   towerModelLines,
+  towerScope,
   towerSpec,
   towerTotal,
   type CommercialTower,
@@ -244,12 +245,18 @@ function commercialValues(data: ProposalData): Record<string, unknown> {
     // Pricing schedule: the template repeats its page for each entry
     flowType: data.flowType,
     pricingPages,
-    // Scope of supply
-    scope: c.scope.map((item) => ({
-      description: [item.material?.trim(), item.description.trim()].filter(Boolean).join(" "),
-      truwater: item.responsibility === "Truwater",
-      optional: item.responsibility === "Optional",
-      purchaser: item.responsibility === "Purchaser",
+    // Scope of supply: one table per tower type, headed "Tower Type 2 – Crossflow – Model …" when there's more than one
+    scopeTables: towers.map((tower, index) => ({
+      heading:
+        towers.length > 1
+          ? [`Tower Type ${index + 1}`, tower.flowType, tower.model && `Model ${tower.model}`].filter(Boolean).join(" – ")
+          : "",
+      scope: towerScope(data, index).map((item) => ({
+        description: [item.material?.trim(), item.description.trim()].filter(Boolean).join(" "),
+        truwater: item.responsibility === "Truwater",
+        optional: item.responsibility === "Optional",
+        purchaser: item.responsibility === "Purchaser",
+      })),
     })),
     // Optional items
     constructionSpares: listItems(c.constructionSpares),

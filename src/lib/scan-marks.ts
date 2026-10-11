@@ -1,4 +1,4 @@
-import { resolvedCommercialTowers, towerSpecKey, type CommercialTower, type ProposalData } from "@/lib/proposal";
+import { resolvedCommercialTowers, towerScope, towerSpecKey, type CommercialTower, type ProposalData } from "@/lib/proposal";
 import { scopeIndex } from "@/lib/scan-fields";
 import type { ScanFieldId } from "@/lib/scan-parse";
 
@@ -6,7 +6,7 @@ import type { ScanFieldId } from "@/lib/scan-parse";
  * Commercial Proposal boxes a scan didn't fill, so they can be done by hand. Each key keeps the value the box
  * had right after the scan; a box stays marked until its value changes.
  *
- * Keys: "attention", "tower.<index>.<field>", "scope.<index>", "deliveryTime", "containers", "deliverySite".
+ * Keys: "attention", "tower.<index>.<field>", "scope.<tower>.<row>", "deliveryTime", "containers", "deliverySite".
  */
 export type ScanMarks = { fileName: string; boxes: Map<string, string> };
 
@@ -35,14 +35,14 @@ const TOWER_BOXES: (keyof CommercialTower)[] = [
 const SHARED_BOXES = ["attention", "deliveryTime", "containers", "deliverySite"] as const;
 
 export const towerBox = (index: number, field: keyof CommercialTower) => `tower.${index}.${field}`;
-export const scopeBox = (index: number) => `scope.${index}`;
+export const scopeBox = (tower: number, row: number) => `scope.${tower}.${row}`;
 
 /** A box's current value (spec-linked tower boxes show what the RFQ holds). */
 export function commercialBoxValue(data: ProposalData, key: string): string {
   const [kind, a, b] = key.split(".");
   if (kind === "tower") return String(resolvedCommercialTowers(data)[Number(a)]?.[b as keyof CommercialTower] ?? "");
   if (kind === "scope") {
-    const item = data.commercial.scope[Number(a)];
+    const item = towerScope(data, Number(a))[Number(b)];
     return item ? `${item.material ?? ""}|${item.description}` : "";
   }
   return String(data.commercial[key as (typeof SHARED_BOXES)[number]] ?? "");
@@ -53,16 +53,16 @@ function boxForField(data: ProposalData, id: ScanFieldId, index: number): string
   if (id === "attention") return "attention";
   if (id === "towerModel") return towerBox(index, "model");
   if (id === "flowType" || id === "equipment" || id === "basin") return towerBox(index, id);
-  const scope = scopeIndex(data, id);
-  if (scope >= 0) return scopeBox(scope);
+  const scope = scopeIndex(data, id, index);
+  if (scope >= 0) return scopeBox(index, scope);
   // Spec fields reach the tower boxes linked to them ("No of Cells" -> "No. Of Cells").
   const field = TOWER_BOXES.find((f) => towerSpecKey(f) === id);
   return field ? towerBox(index, field) : null;
 }
 
 /**
- * Marks after a scan into tower type `index`: that tower's boxes and the shared ones are re-marked, except
- * the ones the scan filled. Marks on other towers from earlier scans are kept.
+ * Marks after a scan into tower type `index`: that tower's boxes, its scope and the shared ones are re-marked,
+ * except the ones the scan filled. Marks on other towers (and their scopes) from earlier scans are kept.
  */
 export function markUnfilled(
   previous: ScanMarks | null,
@@ -75,10 +75,13 @@ export function markUnfilled(
   const keys = [
     ...SHARED_BOXES,
     ...TOWER_BOXES.map((field) => towerBox(index, field)),
-    ...data.commercial.scope.flatMap((item, i) => (item.responsibility === "Truwater" ? [scopeBox(i)] : [])),
+    ...towerScope(data, index).flatMap((item, i) => (item.responsibility === "Truwater" ? [scopeBox(index, i)] : [])),
   ];
   const boxes = new Map(
-    [...(previous?.boxes ?? [])].filter(([key]) => key.startsWith("tower.") && !key.startsWith(`tower.${index}.`))
+    [...(previous?.boxes ?? [])].filter(([key]) => {
+      const [kind, tower] = key.split(".");
+      return (kind === "tower" || kind === "scope") && Number(tower) !== index;
+    })
   );
   for (const key of keys) {
     if (!filledBoxes.has(key)) boxes.set(key, commercialBoxValue(data, key));

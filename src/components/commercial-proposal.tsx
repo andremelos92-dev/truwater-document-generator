@@ -9,7 +9,9 @@ import {
   PORT_DELIVERY,
   SIGNATORIES,
   type FlowType,
+  towerScope,
   towerSpecKey,
+  withTowerScope,
   towerTotal,
   type CommercialProposalData,
   type CommercialScopeItem,
@@ -140,8 +142,8 @@ export function CommercialProposal({
 }: CommercialProposalProps) {
   const marked = (key: string) => isMarked(scanMarks, data, key);
   const markedCount = scanMarks ? [...scanMarks.boxes.keys()].filter(marked).length : 0;
-  /** Scope rows with "Other" chosen but nothing typed yet (an empty material otherwise means "—"). */
-  const [otherScopeRows, setOtherScopeRows] = useState<Set<number>>(() => new Set());
+  /** Scope rows ("<tower>.<row>") with "Other" chosen but nothing typed yet (an empty material otherwise means "—"). */
+  const [otherScopeRows, setOtherScopeRows] = useState<Set<string>>(() => new Set());
   const title = projectTitle(data) || "Project name from Documents form";
   const recipient = proposalRecipient(data) || "Customer from Documents form";
   const updateCommercial = (commercial: CommercialProposalData) => onChange({ commercial });
@@ -150,7 +152,6 @@ export function CommercialProposal({
     value: CommercialProposalData[K]
   ) => updateCommercial({ ...data.commercial, [key]: value });
   const towers = resolvedCommercialTowers(data);
-  const scopeRows = bidFormScopeOrder(data.commercial.scope);
   const port = towers[0]?.port.trim() ?? "";
   const delivery = PORT_DELIVERY[port];
 
@@ -171,11 +172,17 @@ export function CommercialProposal({
     );
   };
 
-  const setScopeField = (index: number, key: "material" | "description" | "responsibility", value: string) =>
-    updateCommercialField(
-      "scope",
-      data.commercial.scope.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [key]: value } : item
+  const setScopeField = (
+    tower: number,
+    index: number,
+    key: "material" | "description" | "responsibility",
+    value: string
+  ) =>
+    updateCommercial(
+      withTowerScope(
+        data.commercial,
+        tower,
+        towerScope(data, tower).map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item))
       )
     );
 
@@ -411,89 +418,103 @@ export function CommercialProposal({
             standard.
           </CardDescription>
         </CardHeader>
-        {/* Fills down the left column first, in bid form order, so it reads like the scanned document. */}
-        <CardContent
-          className={cn(
-            PAD,
-            "grid gap-x-3 gap-y-1.5 sm:grid-flow-col sm:grid-cols-2 sm:grid-rows-[repeat(var(--scope-rows),auto)]"
-          )}
-          style={{ "--scope-rows": Math.ceil(scopeRows.length / 2) } as React.CSSProperties}
-        >
-          {/* Material and description are joined into one control. */}
-          {scopeRows.map(({ item, index }) =>
-            item.responsibility === "Truwater" ? (
-              <div
-                key={index}
-                className={cn(
-                  "relative flex min-w-0 rounded-md",
-                  marked(scopeBox(index)) && "ring-2 ring-amber-400/70 ring-offset-1"
+        <CardContent className={cn(PAD, "grid gap-5")}>
+          {towers.map((details, tower) => {
+            const scopeRows = bidFormScopeOrder(towerScope(data, tower));
+            return (
+              <div key={tower} className={cn("grid gap-2", tower > 0 && "border-t pt-4")}>
+                {towers.length > 1 && (
+                  <p className="text-sm font-semibold">
+                    Tower Type {tower + 1}
+                    <span className="text-muted-foreground ml-2 font-normal">
+                      {[details.flowType, details.model].filter(Boolean).join(" · ")}
+                    </span>
+                  </p>
                 )}
-              >
-                {marked(scopeBox(index)) && (
-                  <span className="absolute -top-1.5 -left-1 z-10 leading-none">
-                    <ScanStar />
-                  </span>
+                {/* Fills down the left column first, in bid form order, so it reads like the scanned document. */}
+                <div
+                  className="grid gap-x-3 gap-y-1.5 sm:grid-flow-col sm:grid-cols-2 sm:grid-rows-[repeat(var(--scope-rows),auto)]"
+                  style={{ "--scope-rows": Math.ceil(scopeRows.length / 2) } as React.CSSProperties}
+                >
+                {/* Material and description are joined into one control. */}
+                {scopeRows.map(({ item, index }) =>
+                  item.responsibility === "Truwater" ? (
+                    <div
+                      key={index}
+                      className={cn(
+                        "relative flex min-w-0 rounded-md",
+                        marked(scopeBox(tower, index)) && "ring-2 ring-amber-400/70 ring-offset-1"
+                      )}
+                    >
+                      {marked(scopeBox(tower, index)) && (
+                        <span className="absolute -top-1.5 -left-1 z-10 leading-none">
+                          <ScanStar />
+                        </span>
+                      )}
+                      {(() => {
+                        const material = item.material ?? "";
+                        const options = item.materialOptions ?? [];
+                        // Rows without a suggested material can also print with none ("—").
+                        const noneAllowed = options.length === 0;
+                        const other =
+                          !options.includes(material) && (material !== "" || !noneAllowed || otherScopeRows.has(`${tower}.${index}`));
+                        return (
+                          <>
+                            {/* Any material that is not one of the options is "Other", typed in the box beside it. */}
+                            <div className="shrink-0">
+                              <NativeSelect
+                                aria-label={`Material for tower type ${tower + 1} scope item ${index + 1}`}
+                                className="bg-muted/50 field-sizing-content h-8 w-auto min-w-[5.25rem] rounded-r-none pr-7 pl-2 font-medium md:text-sm"
+                                value={other ? OTHER_MATERIAL : material}
+                                onChange={(event) => {
+                                  const choseOther = event.target.value === OTHER_MATERIAL;
+                                  setOtherScopeRows((rows) => {
+                                    const next = new Set(rows);
+                                    if (choseOther) next.add(`${tower}.${index}`);
+                                    else next.delete(`${tower}.${index}`);
+                                    return next;
+                                  });
+                                  setScopeField(tower, index, "material", choseOther ? "" : event.target.value);
+                                  if (choseOther)
+                                    requestAnimationFrame(() =>
+                                      document.getElementById(`commercial-scope-${tower}-${index}-other`)?.focus()
+                                    );
+                                }}
+                              >
+                                {noneAllowed ? <option value="">—</option> : null}
+                                {[...options, OTHER_MATERIAL].map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </NativeSelect>
+                            </div>
+                            {other ? (
+                              <Input
+                                id={`commercial-scope-${tower}-${index}-other`}
+                                aria-label={`Other material for tower type ${tower + 1} scope item ${index + 1}`}
+                                placeholder="Type material"
+                                className="field-sizing-content -ml-px h-8 w-auto max-w-32 min-w-[6.5rem] shrink-0 rounded-none px-2 font-medium md:text-sm"
+                                value={material}
+                                onChange={(event) => setScopeField(tower, index, "material", event.target.value)}
+                              />
+                            ) : null}
+                          </>
+                        );
+                      })()}
+                      <Input
+                        aria-label={`Tower type ${tower + 1} Truwater scope item ${index + 1}`}
+                        className="-ml-px h-8 min-w-0 flex-1 rounded-l-none px-2 md:text-sm"
+                        value={item.description}
+                        onChange={(event) => setScopeField(tower, index, "description", event.target.value)}
+                      />
+                    </div>
+                  ) : null
                 )}
-                {(() => {
-                  const material = item.material ?? "";
-                  const options = item.materialOptions ?? [];
-                  // Rows without a suggested material can also print with none ("—").
-                  const noneAllowed = options.length === 0;
-                  const other =
-                    !options.includes(material) && (material !== "" || !noneAllowed || otherScopeRows.has(index));
-                  return (
-                    <>
-                      {/* Any material that is not one of the options is "Other", typed in the box beside it. */}
-                      <div className="shrink-0">
-                        <NativeSelect
-                          aria-label={`Material for scope item ${index + 1}`}
-                          className="bg-muted/50 field-sizing-content h-8 w-auto min-w-[5.25rem] rounded-r-none pr-7 pl-2 font-medium md:text-sm"
-                          value={other ? OTHER_MATERIAL : material}
-                          onChange={(event) => {
-                            const choseOther = event.target.value === OTHER_MATERIAL;
-                            setOtherScopeRows((rows) => {
-                              const next = new Set(rows);
-                              if (choseOther) next.add(index);
-                              else next.delete(index);
-                              return next;
-                            });
-                            setScopeField(index, "material", choseOther ? "" : event.target.value);
-                            if (choseOther)
-                              requestAnimationFrame(() =>
-                                document.getElementById(`commercial-scope-${index}-other`)?.focus()
-                              );
-                          }}
-                        >
-                          {noneAllowed ? <option value="">—</option> : null}
-                          {[...options, OTHER_MATERIAL].map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </NativeSelect>
-                      </div>
-                      {other ? (
-                        <Input
-                          id={`commercial-scope-${index}-other`}
-                          aria-label={`Other material for scope item ${index + 1}`}
-                          placeholder="Type material"
-                          className="field-sizing-content -ml-px h-8 w-auto max-w-32 min-w-[6.5rem] shrink-0 rounded-none px-2 font-medium md:text-sm"
-                          value={material}
-                          onChange={(event) => setScopeField(index, "material", event.target.value)}
-                        />
-                      ) : null}
-                    </>
-                  );
-                })()}
-                <Input
-                  aria-label={`Truwater scope item ${index + 1}`}
-                  className="-ml-px h-8 min-w-0 flex-1 rounded-l-none px-2 md:text-sm"
-                  value={item.description}
-                  onChange={(event) => setScopeField(index, "description", event.target.value)}
-                />
+                </div>
               </div>
-            ) : null
-          )}
+            );
+          })}
         </CardContent>
       </Card>
       {/* Optional items (A spare parts, B supervision rates), purchaser responsibilities, the delivery schedule

@@ -4,7 +4,9 @@ import {
   SPEC_ROWS,
   addTowerType,
   createInitialProposal,
+  towerScope,
   towerSpec,
+  withTowerScope,
   type FlowType,
   type ProposalData,
   type SpecKey,
@@ -14,7 +16,7 @@ import type { ScanFieldId } from "@/lib/scan-parse";
 export type ScanField = {
   id: ScanFieldId;
   label: string;
-  /** Project details, the chosen tower type, or the Commercial Proposal's Scope of Supply (shared by all towers). */
+  /** Project details, the chosen tower type, or that tower type's Commercial Proposal Scope of Supply. */
   group: "project" | "tower" | "scope";
   /** Choices for fields that only take set values. */
   options?: readonly string[];
@@ -59,11 +61,11 @@ const SCOPE_ITEMS: Partial<Record<ScanFieldId, { match: RegExp; part: "material"
   scopeMotor: { match: /\bphase\b/i, part: "description" },
 };
 
-/** The Scope of Supply row a scanned field fills, or -1. */
-export function scopeIndex(data: ProposalData, id: ScanFieldId): number {
+/** The row of tower type `tower`'s Scope of Supply a scanned field fills, or -1. */
+export function scopeIndex(data: ProposalData, id: ScanFieldId, tower: number): number {
   const item = SCOPE_ITEMS[id];
   return item
-    ? data.commercial.scope.findIndex((s) => s.responsibility === "Truwater" && item.match.test(s.description.trim()))
+    ? towerScope(data, tower).findIndex((s) => s.responsibility === "Truwater" && item.match.test(s.description.trim()))
     : -1;
 }
 
@@ -127,7 +129,7 @@ export function currentScanValue(data: ProposalData, id: ScanFieldId, index: num
       return extra?.ctiCertified === undefined ? "" : extra.ctiCertified ? "Yes" : "No";
     default: {
       if (isSpecKey(id)) return towerSpec(data, index)[id];
-      const item = data.commercial.scope[scopeIndex(data, id)];
+      const item = towerScope(data, index)[scopeIndex(data, id, index)];
       if (!item) return "";
       return SCOPE_ITEMS[id]?.part === "description" ? item.description : (item.material ?? "");
     }
@@ -155,12 +157,12 @@ export function isUntouched(data: ProposalData, id: ScanFieldId, index: number):
   return !now || now === currentScanValue(INITIAL, id, 0).trim();
 }
 
-/** Whether the scan has somewhere to put this field (the Scope of Supply items can be renamed or removed). */
-export function canApply(data: ProposalData, id: ScanFieldId): boolean {
-  return !SCOPE_ITEMS[id] || scopeIndex(data, id) >= 0;
+/** Whether the scan has somewhere to put this field in tower type `index` (scope items can be renamed or removed). */
+export function canApply(data: ProposalData, id: ScanFieldId, index: number): boolean {
+  return !SCOPE_ITEMS[id] || scopeIndex(data, id, index) >= 0;
 }
 
-/** Fills the chosen values into tower type `target` (or a new tower type), the project details and the scope. */
+/** Fills the chosen values into tower type `target` (or a new tower type) and its scope, and the project details. */
 export function applyScan(
   data: ProposalData,
   values: Partial<Record<ScanFieldId, string>>,
@@ -172,7 +174,7 @@ export function applyScan(
   const spec = { ...towerSpec(next, index) };
   const towers = [...next.commercial.towers];
   const tower = { ...towers[index] };
-  const scope = [...next.commercial.scope];
+  const scope = [...towerScope(next, index)];
   const summary = Array.from({ length: Math.max(next.selectionSummary.length, index + 1) }, (_, i) => next.selectionSummary[i]);
   const extra = { ...EMPTY_SUMMARY_EXTRA, ...summary[index] };
   const top: Partial<ProposalData> = {};
@@ -184,7 +186,7 @@ export function applyScan(
     const scopeItem = SCOPE_ITEMS[id];
     if (isSpecKey(id)) spec[id] = value;
     else if (scopeItem) {
-      const at = scopeIndex(next, id);
+      const at = scopeIndex(next, id, index);
       if (at >= 0) scope[at] = { ...scope[at], [scopeItem.part]: value };
     } else if (id === "towerModel") {
       if (index === 0) top.towerModel = value;
@@ -206,7 +208,7 @@ export function applyScan(
   next = {
     ...next,
     ...top,
-    commercial: { ...next.commercial, attention, towers, scope },
+    commercial: { ...withTowerScope(next.commercial, index, scope), attention, towers },
     selectionSummary: summary.map((item) => item ?? EMPTY_SUMMARY_EXTRA),
   };
   return index === 0

@@ -167,7 +167,10 @@ export type CommercialProposalData = {
   /** "ATTN." line on the cover letter. */
   attention: string;
   towers: CommercialTower[];
+  /** Scope of Supply of tower type 1. */
   scope: CommercialScopeItem[];
+  /** Scope of Supply of tower types 2, 3… (each printed as its own table). */
+  extraScopes: CommercialScopeItem[][];
   constructionSpares: string;
   specialTools: string;
   recommendedSpares: string;
@@ -206,6 +209,7 @@ export function createInitialCommercialProposal(): CommercialProposalData {
     signature1: "craig",
     signature2: "kenx",
     towers: [createBlankTower()],
+    extraScopes: [],
     scope: [
       { material: "SS316", materialOptions: STRUCTURAL_MATERIALS, description: "Frameworks", responsibility: "Truwater" },
       { material: "SS316", materialOptions: STRUCTURAL_MATERIALS, description: "Cold Water Basin Supporting Framework", responsibility: "Truwater" },
@@ -366,12 +370,40 @@ export function towerModelLines(data: Pick<ProposalData, "flowType" | "towerMode
   }).filter(Boolean);
 }
 
-/** Adds a tower type: a blank specification plus its Commercial Proposal tower. */
+/**
+ * The Scope of Supply of tower type `index`. Tower types saved before each had their own scope (or not made
+ * yet) use tower type 1's.
+ */
+export function towerScope(data: Pick<ProposalData, "commercial">, index: number): CommercialScopeItem[] {
+  return (index > 0 && data.commercial.extraScopes?.[index - 1]) || data.commercial.scope;
+}
+
+/** The Commercial Proposal with tower type `index`'s Scope of Supply replaced. */
+export function withTowerScope(
+  commercial: CommercialProposalData,
+  index: number,
+  scope: CommercialScopeItem[]
+): CommercialProposalData {
+  if (index === 0) return { ...commercial, scope };
+  const extraScopes = Array.from(
+    { length: Math.max(commercial.extraScopes?.length ?? 0, index) },
+    (_, i) => commercial.extraScopes?.[i] ?? commercial.scope
+  );
+  extraScopes[index - 1] = scope;
+  return { ...commercial, extraScopes };
+}
+
+/** Adds a tower type: a blank specification plus its Commercial Proposal tower, starting from tower 1's scope. */
 export function addTowerType<T extends Pick<ProposalData, "extraSpecs" | "commercial">>(data: T): T {
+  const commercial = withTowerScope(
+    data.commercial,
+    data.extraSpecs.length + 1,
+    data.commercial.scope.map((item) => ({ ...item }))
+  );
   return {
     ...data,
     extraSpecs: [...data.extraSpecs, createEmptySpec()],
-    commercial: { ...data.commercial, towers: [...data.commercial.towers, createBlankTower()] },
+    commercial: { ...commercial, towers: [...commercial.towers, createBlankTower()] },
   };
 }
 
@@ -384,7 +416,11 @@ export function removeTowerType<T extends Pick<ProposalData, "extraSpecs" | "com
     ...data,
     extraSpecs: data.extraSpecs.filter((_, i) => i !== index - 1),
     selectionSummary: data.selectionSummary.filter((_, i) => i !== index),
-    commercial: { ...data.commercial, towers: data.commercial.towers.filter((_, i) => i !== index) },
+    commercial: {
+      ...data.commercial,
+      towers: data.commercial.towers.filter((_, i) => i !== index),
+      extraScopes: (data.commercial.extraScopes ?? []).filter((_, i) => i !== index - 1),
+    },
   };
 }
 

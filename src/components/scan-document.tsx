@@ -63,9 +63,9 @@ export function ScanDocumentButton({ data, onApply, towerIndex }: ScanDocumentBu
     new Set(
       SCAN_FIELDS.filter(({ id, group }) => {
         const found = result[id]?.value;
-        if (!found || !canApply(data, id)) return false;
-        if (to === "new" && group === "tower") return true;
         const index = to === "new" ? towerCount : to;
+        if (!found || !canApply(data, id, index)) return false;
+        if (to === "new" && group === "tower") return true;
         return isUntouched(data, id, index) || currentScanValue(data, id, index).trim() === found;
       }).map(({ id }) => id)
     );
@@ -111,7 +111,7 @@ export function ScanDocumentButton({ data, onApply, towerIndex }: ScanDocumentBu
 
   const row = (field: ScanField, result: ScanResult) => {
     const finding = result[field.id];
-    if (!finding || !canApply(data, field.id)) return null;
+    if (!finding || !canApply(data, field.id, targetIndex)) return null;
     const now = current(field.id);
     const isChecked = checked.has(field.id);
     const toggle = () =>
@@ -264,7 +264,7 @@ export function ScanDocumentButton({ data, onApply, towerIndex }: ScanDocumentBu
                             ? "Project & contact"
                             : group === "tower"
                               ? "Cooling tower specification"
-                              : "Commercial Proposal · Scope of Supply (all tower types)"}
+                              : `Commercial Proposal · Scope of Supply (Tower Type ${targetIndex + 1})`}
                         </h3>
                         <div>{rows}</div>
                       </section>
