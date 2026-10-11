@@ -343,6 +343,29 @@ export function resolvedCommercialTowers(data: TowerSource) {
   });
 }
 
+/** Tower type `index`'s Counterflow / Crossflow / Closed Circuit (tower 1's is the Technical Proposal's Tower Type). */
+export function towerFlowType(data: Pick<ProposalData, "flowType" | "commercial">, index: number): FlowType | "" {
+  return index === 0 ? data.flowType : (data.commercial.towers[index]?.flowType ?? "");
+}
+
+/** Tower type `index`'s model (tower 1's is the Technical Proposal's Model). */
+export function towerModel(data: Pick<ProposalData, "towerModel" | "commercial">, index: number): string {
+  return (index === 0 ? data.towerModel : (data.commercial.towers[index]?.model ?? "")).trim();
+}
+
+/**
+ * "Counterflow Model - ECF1212F4-1B-1", one per tower type, for the Technical and Commercial covers. Extra
+ * tower types with neither a type nor a model are left out.
+ */
+export function towerModelLines(data: Pick<ProposalData, "flowType" | "towerModel" | "commercial" | "extraSpecs">): string[] {
+  return Array.from({ length: 1 + data.extraSpecs.length }, (_, index) => {
+    const flowType = towerFlowType(data, index);
+    const model = towerModel(data, index);
+    if (index > 0 && !flowType && !model) return "";
+    return [`${flowType} Model`.trim(), model].filter(Boolean).join(" - ");
+  }).filter(Boolean);
+}
+
 /** Adds a tower type: a blank specification plus its Commercial Proposal tower. */
 export function addTowerType<T extends Pick<ProposalData, "extraSpecs" | "commercial">>(data: T): T {
   return {

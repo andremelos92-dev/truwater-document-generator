@@ -12,6 +12,8 @@ import {
   referenceNumber,
   resolvedCommercialTowers,
   SIGNATORIES,
+  towerFlowType,
+  towerModelLines,
   towerSpec,
   towerTotal,
   type CommercialTower,
@@ -30,10 +32,10 @@ type DocumentTemplate = {
   /** Word file in /public/templates with {placeholders}. */
   templateUrl: string;
   fileName: (data: ProposalData) => string;
-  values: (data: ProposalData) => TemplateValues;
+  values: (data: ProposalData) => Record<string, unknown>;
 };
 
-function rfqValues(data: ProposalData): TemplateValues {
+function rfqValues(data: ProposalData): Record<string, unknown> {
   const title = projectTitle(data);
   return {
     documentTitle: [title, data.customerDetail.trim()].filter(Boolean).join(" "),
@@ -52,8 +54,17 @@ function rfqValues(data: ProposalData): TemplateValues {
     greeting: data.greeting,
     summaryIntro: data.summaryIntro,
     folderLink: data.folderLink.trim(),
-    ...Object.fromEntries(SPEC_ROWS.map((row) => [`spec_${row.key}`, data.spec[row.key]])),
+    towerSpecs: rfqTowerSpecs(data),
   };
+}
+
+/** The RFQ's specification table, repeated per tower type; headed "Tower Type 2 – Crossflow" when there's more than one. */
+function rfqTowerSpecs(data: ProposalData) {
+  const count = 1 + data.extraSpecs.length;
+  return Array.from({ length: count }, (_, index) => ({
+    heading: count > 1 ? [`Tower Type ${index + 1}`, towerFlowType(data, index)].filter(Boolean).join(" – ") : "",
+    ...Object.fromEntries(SPEC_ROWS.map((row) => [`spec_${row.key}`, towerSpec(data, index)[row.key]])),
+  }));
 }
 
 function revisionValues(revisions: Revision[]): TemplateValues {
@@ -72,7 +83,8 @@ function technicalProposalValues(data: ProposalData): TemplateValues {
     projectTitle: projectTitle(data),
     // The cover is addressed to the chosen recipient (customer, regional partner or other).
     customerDetail: proposalRecipient(data),
-    modelLine: [`${data.flowType} Model`, data.towerModel.trim()].filter(Boolean).join(" - "),
+    // One line per tower type.
+    modelLine: towerModelLines(data).join("\n"),
     referenceNumber: referenceNumber(data),
     ...revisionValues(data.revisions),
   };
@@ -220,7 +232,7 @@ function commercialValues(data: ProposalData): Record<string, unknown> {
     projectTitle: projectTitle(data),
     coverParties: [customer, partner].filter(Boolean),
     // Same model line and reference as the Technical Proposal cover.
-    coverTowerLines: [[`${data.flowType} Model`, data.towerModel.trim()].filter(Boolean).join(" - ")],
+    coverTowerLines: towerModelLines(data),
     commercialReference: referenceNumber(data),
     ...revisionValues(c.revisions),
     // Cover letter

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Loader2, ScanLine, TriangleAlert, X } from "lucide-react";
 
 import { MAX_TOWER_TYPES, type ProposalData } from "@/lib/proposal";
@@ -18,6 +18,8 @@ export type AppliedScan = { fileName: string; towerIndex: number; filled: ScanFi
 type ScanDocumentButtonProps = {
   data: ProposalData;
   onApply: (next: ProposalData, scan: AppliedScan) => void;
+  /** The tower type to fill (it can still be changed in the review); by default the first empty one or a new one. */
+  towerIndex?: number;
 };
 
 type Target = number | "new";
@@ -40,7 +42,8 @@ function defaultTarget(data: ProposalData): Target {
  * "Scan Document" button: reads a bid form, spec or scan in the browser (nothing is uploaded), then lists
  * what it found so each value can be checked, corrected and applied to the form.
  */
-export function ScanDocumentButton({ data, onApply }: ScanDocumentButtonProps) {
+export function ScanDocumentButton({ data, onApply, towerIndex }: ScanDocumentButtonProps) {
+  const dialogId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<State>({ phase: "idle" });
@@ -85,7 +88,7 @@ export function ScanDocumentButton({ data, onApply }: ScanDocumentButtonProps) {
         });
         return;
       }
-      const to = defaultTarget(data);
+      const to = towerIndex ?? defaultTarget(data);
       setTarget(to);
       setValues(Object.fromEntries(Object.entries(result).map(([id, finding]) => [id, finding!.value])));
       setChecked(defaultChecks(result, to));
@@ -172,7 +175,13 @@ export function ScanDocumentButton({ data, onApply }: ScanDocumentButtonProps) {
 
   return (
     <>
-      <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        title={towerIndex === undefined ? undefined : `Scan a document into Tower Type ${towerIndex + 1}`}
+        onClick={() => fileRef.current?.click()}
+      >
         <ScanLine /> Scan Document
       </Button>
       <input
@@ -190,14 +199,14 @@ export function ScanDocumentButton({ data, onApply }: ScanDocumentButtonProps) {
         ref={dialogRef}
         onClose={() => setState({ phase: "idle" })}
         onClick={(event) => event.target === dialogRef.current && state.phase !== "reading" && close()}
-        aria-labelledby="scan-title"
+        aria-labelledby={`${dialogId}-title`}
         className="bg-background text-foreground m-auto w-[calc(100%-2rem)] max-w-3xl rounded-xl border p-0 shadow-xl backdrop:bg-black/50"
       >
         {state.phase !== "idle" && (
           <div className="grid max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto]">
             <div className="flex items-start justify-between gap-3 border-b px-4 py-3 sm:px-6">
               <div className="min-w-0">
-                <h2 id="scan-title" className="font-semibold">
+                <h2 id={`${dialogId}-title`} className="font-semibold">
                   Scan Document
                 </h2>
                 <p className="text-muted-foreground truncate text-sm">{state.fileName}</p>
@@ -221,11 +230,11 @@ export function ScanDocumentButton({ data, onApply }: ScanDocumentButtonProps) {
               {state.phase === "review" && (
                 <div className="grid gap-4">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <label htmlFor="scan-target" className="text-sm font-medium">
+                    <label htmlFor={`${dialogId}-target`} className="text-sm font-medium">
                       Fill tower values into
                     </label>
                     <NativeSelect
-                      id="scan-target"
+                      id={`${dialogId}-target`}
                       className="h-8 w-auto md:text-sm"
                       value={String(target)}
                       onChange={(event) => {

@@ -6,7 +6,7 @@ import { Eye, FileDown, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { CommercialProposal } from "@/components/commercial-proposal";
 import { InquiryForm } from "@/components/inquiry-form";
 import { DocumentPreview, type PreviewDocument } from "@/components/document-preview";
-import { ScanDocumentButton } from "@/components/scan-document";
+import { ScanDocumentButton, type AppliedScan } from "@/components/scan-document";
 import { markUnfilled, type ScanMarks } from "@/lib/scan-marks";
 import { SelectionSummaryButton } from "@/components/selection-summary";
 import { RevisionsEditor } from "@/components/revisions-editor";
@@ -25,6 +25,7 @@ import {
   proposalRecipient,
   referenceNumber,
   SPEC_ROWS,
+  towerFlowType,
   type FlowType,
   type ProposalData,
   type Recipient,
@@ -130,6 +131,31 @@ export function ProposalForm() {
           }
     );
 
+  // Tower type 1's type and model are the Technical Proposal cover's; 2, 3… are kept on their Commercial tower.
+  const setTowerAt = (index: number, updates: { flowType?: FlowType; model?: string }) =>
+    setData((prev) =>
+      index === 0
+        ? {
+            ...prev,
+            ...(updates.flowType !== undefined && { flowType: updates.flowType }),
+            ...(updates.model !== undefined && { towerModel: updates.model }),
+          }
+        : {
+            ...prev,
+            commercial: {
+              ...prev.commercial,
+              towers: prev.commercial.towers.map((tower, i) => (i === index ? { ...tower, ...updates } : tower)),
+            },
+          }
+    );
+
+  const applyScan = (next: ProposalData, scan: AppliedScan) => {
+    setData(next);
+    setScanMarks((previous) => markUnfilled(previous, next, scan.towerIndex, scan.filled, scan.fileName));
+  };
+
+  const towerCount = 1 + data.extraSpecs.length;
+
   const field = (
     id: TextField,
     label: string,
@@ -149,9 +175,11 @@ export function ProposalForm() {
       setError("Select the Tower Type (Counterflow, Crossflow or Closed Circuit) on the RFQ & Technical Proposal tab first.");
       return;
     }
-    const untyped = kind === "commercial" ? data.commercial.towers.findIndex((t, i) => i > 0 && !t.flowType) : -1;
+    // Every tower type is printed on the Technical and Commercial Proposals.
+    const untyped =
+      kind === "commercial" || kind === "proposal" ? data.commercial.towers.findIndex((t, i) => i > 0 && !t.flowType) : -1;
     if (untyped > 0) {
-      setError(`Select the Type (Counterflow, Crossflow or Closed Circuit) for cooling tower ${untyped + 1}.`);
+      setError(`Select the Type (Counterflow, Crossflow or Closed Circuit) for tower type ${untyped + 1}.`);
       return;
     }
     setGenerating({ kind, preview });
@@ -224,13 +252,7 @@ export function ProposalForm() {
           <CardTitle>Project Details</CardTitle>
           <CardDescription className="col-start-1">Used by both the RFQ and the Technical Proposal.</CardDescription>
           <div className="col-start-2 row-span-2 row-start-1 self-start">
-            <ScanDocumentButton
-              data={data}
-              onApply={(next, scan) => {
-                setData(next);
-                setScanMarks((previous) => markUnfilled(previous, next, scan.towerIndex, scan.filled, scan.fileName));
-              }}
-            />
+            <ScanDocumentButton data={data} onApply={applyScan} />
           </div>
         </CardHeader>
         <CardContent className="grid gap-5">
@@ -338,22 +360,23 @@ export function ProposalForm() {
             variant="outline"
             size="sm"
             onClick={() => setData((prev) => addTowerType(prev))}
-            disabled={data.extraSpecs.length + 1 >= MAX_TOWER_TYPES}
+            disabled={towerCount >= MAX_TOWER_TYPES}
           >
-            <Plus /> Add New
+            <Plus /> Add Tower
           </Button>
         </CardHeader>
         <CardContent className="grid gap-6">
           {[data.spec, ...data.extraSpecs].map((spec, index) => (
             <div key={index} className={cn("grid gap-3", index > 0 && "border-t pt-5")}>
-              {data.extraSpecs.length > 0 && (
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold">
-                    Tower Type {index + 1}
-                    <span className="text-muted-foreground ml-2 font-normal">
-                      {index === 0 ? "used by the RFQ · pricing schedule 1" : `pricing schedule ${index + 1}`}
-                    </span>
-                  </p>
+              {/* Each tower type can be scanned from its own document; the customer details are shared. */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-semibold">
+                  Tower Type {index + 1}
+                  {towerCount > 1 && (
+                    <span className="text-muted-foreground ml-2 font-normal">pricing schedule {index + 1}</span>
+                  )}
+                </p>
+                <div className="flex gap-2">
                   {index > 0 && (
                     <Button
                       type="button"
@@ -364,26 +387,14 @@ export function ProposalForm() {
                       <Trash2 /> Remove
                     </Button>
                   )}
+                  <ScanDocumentButton data={data} onApply={applyScan} towerIndex={index} />
                 </div>
-              )}
+              </div>
               {(() => {
-                // Printed in this tower type's pricing schedule description ("… Induced Draft, Counterflow, …").
-                // Tower type 1 shares it with the Tower Type on the Technical Proposal cover.
-                const flowType = index === 0 ? data.flowType : (data.commercial.towers[index]?.flowType ?? "");
-                const setFlowType = (value: FlowType) =>
-                  setData((prev) =>
-                    index === 0
-                      ? { ...prev, flowType: value }
-                      : {
-                          ...prev,
-                          commercial: {
-                            ...prev.commercial,
-                            towers: prev.commercial.towers.map((tower, i) =>
-                              i === index ? { ...tower, flowType: value } : tower
-                            ),
-                          },
-                        }
-                  );
+                // Printed in this tower type's pricing schedule description ("… Induced Draft, Counterflow, …")
+                // and shared with its Tower Type on the Technical Proposal cover.
+                const flowType = towerFlowType(data, index);
+                const setFlowType = (value: FlowType) => setTowerAt(index, { flowType: value });
                 return (
                   // The label is as wide as a left-column spec label, so the buttons line up with the fields below;
                   // the buttons then sit side by side across the row.
@@ -492,37 +503,78 @@ export function ProposalForm() {
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="grid gap-2">
-              <Label>
-                Tower Type
-                {!data.flowType && <span className="text-destructive text-xs font-normal">Select one</span>}
-              </Label>
-              <div className="flex flex-wrap gap-2">
-                {FLOW_TYPES.map((flowType) => (
-                  <Button
-                    key={flowType}
-                    type="button"
-                    className="flex-1"
-                    variant={data.flowType === flowType ? "default" : "outline"}
-                    aria-pressed={data.flowType === flowType}
-                    onClick={() => setData((prev) => ({ ...prev, flowType }))}
-                  >
-                    {flowType}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            {field("towerModel", "Model", { placeholder: "ECF1212F4-1B-1" })}
-            <div className="grid gap-2">
-              <Label>Reference No.</Label>
-              <p className="flex h-9 items-center text-sm">
-                {referenceNumber(data) ? (
-                  <span className="font-medium">{referenceNumber(data)}</span>
-                ) : (
-                  <span className="text-muted-foreground">Fills in from the TTA Quote Number</span>
-                )}
-              </p>
+          {/* One model line per tower type; the types are shared with the Cooling Tower Specification above. */}
+          <div className="grid gap-4">
+            {Array.from({ length: towerCount }, (_, index) => {
+              const flowType = towerFlowType(data, index);
+              const modelId = index === 0 ? "towerModel" : `towerModel-${index + 1}`;
+              return (
+                <div key={index} className={cn("grid gap-4 sm:grid-cols-3", index > 0 && "border-t pt-4")}>
+                  <div className="grid gap-2">
+                    <Label>
+                      {towerCount > 1 ? `Tower Type ${index + 1}` : "Tower Type"}
+                      {!flowType && <span className="text-destructive text-xs font-normal">Select one</span>}
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {FLOW_TYPES.map((type) => (
+                        <Button
+                          key={type}
+                          type="button"
+                          className="flex-1"
+                          variant={flowType === type ? "default" : "outline"}
+                          aria-pressed={flowType === type}
+                          onClick={() => setTowerAt(index, { flowType: type })}
+                        >
+                          {type}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid content-start gap-1.5">
+                    <Label htmlFor={modelId}>Model</Label>
+                    <Input
+                      id={modelId}
+                      value={index === 0 ? data.towerModel : (data.commercial.towers[index]?.model ?? "")}
+                      onChange={(event) => setTowerAt(index, { model: event.target.value })}
+                      placeholder="ECF1212F4-1B-1"
+                    />
+                  </div>
+                  {index === 0 ? (
+                    <div className="grid gap-2">
+                      <Label>Reference No.</Label>
+                      <p className="flex h-9 items-center text-sm">
+                        {referenceNumber(data) ? (
+                          <span className="font-medium">{referenceNumber(data)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">Fills in from the TTA Quote Number</span>
+                        )}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex items-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setData((prev) => removeTowerType(prev, index))}
+                      >
+                        <Trash2 /> Remove Tower Type {index + 1}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setData((prev) => addTowerType(prev))}
+                disabled={towerCount >= MAX_TOWER_TYPES}
+              >
+                <Plus /> Add Tower
+              </Button>
             </div>
           </div>
 
