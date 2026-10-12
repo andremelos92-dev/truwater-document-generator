@@ -6,7 +6,8 @@ import type { InquiryData } from "@/lib/inquiry";
  * document's table keeps its own wording and order; it reads each value by key.
  */
 export const SPEC_ROWS = [
-  { key: "customerRequires", label: "Customer Requires", unit: "#", example: "e.g. 8" },
+  // Printed as the Commercial Proposal's Equipment No.
+  { key: "customerRequires", label: "Customer Requires", unit: "#", example: "e.g. CT-69.1/CT-69.2" },
   // General
   { key: "kwCapacity", label: "Heat Load Rejection", unit: "kW", example: "e.g. 1,680" },
   { key: "numberOfCells", label: "No of Cells", unit: "#", example: "e.g. 1" },
@@ -93,6 +94,7 @@ export const PORT_DELIVERY: Partial<Record<string, { site: string; address: stri
 
 /** Tower fields filled from that tower type's Cooling Tower Specification. */
 const TOWER_SPECS: Partial<Record<keyof CommercialTower, SpecKey>> = {
+  equipment: "customerRequires",
   cells: "numberOfCells",
   flowRate: "condenserFlowRate",
   hotTemperature: "condInTemp",
@@ -336,7 +338,9 @@ export function resolvedCommercialTowers(data: TowerSource) {
     for (const key of Object.keys(tower) as (keyof CommercialTower)[]) {
       const specKey = towerSpecKey(key);
       // Spec-linked fields are all text fields.
-      if (specKey) (resolved as Record<string, string>)[key] = spec[specKey].trim();
+      // Proposals saved before Equipment No. came from the RFQ keep the one typed on the Commercial tab.
+      const fallback = key === "equipment" ? tower.equipment.trim() : "";
+      if (specKey) (resolved as Record<string, string>)[key] = spec[specKey].trim() || fallback;
     }
     if (index === 0) {
       // Tower 1's model is always the Technical Proposal cover's Model.

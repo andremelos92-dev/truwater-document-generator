@@ -231,7 +231,8 @@ function commercialValues(data: ProposalData): Record<string, unknown> {
   return {
     // Cover
     projectTitle: projectTitle(data),
-    coverParties: [customer, partner].filter(Boolean),
+    // The partner is left out when it's also the customer (printed once).
+    coverParties: [customer, partner.toLowerCase() === customer.toLowerCase() ? "" : partner].filter(Boolean),
     // Same model line and reference as the Technical Proposal cover.
     coverTowerLines: towerModelLines(data),
     commercialReference: referenceNumber(data),
@@ -247,6 +248,8 @@ function commercialValues(data: ProposalData): Record<string, unknown> {
     pricingPages,
     // Scope of supply: one table per tower type, headed "Tower Type 2 – Crossflow – Model …" when there's more than one
     scopeTables: towers.map((tower, index) => ({
+      // Each tower type after the first starts on its own page, so no table is split across two.
+      newPage: index > 0,
       heading:
         towers.length > 1
           ? [`Tower Type ${index + 1}`, tower.flowType, tower.model && `Model ${tower.model}`].filter(Boolean).join(" – ")

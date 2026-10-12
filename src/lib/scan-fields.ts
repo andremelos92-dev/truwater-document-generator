@@ -79,7 +79,7 @@ export const SCAN_FIELDS: ScanField[] = [
   { id: "contactEmail", label: "Contact email", group: "project" },
   { id: "attention", label: "ATTN. (Commercial cover)", group: "project" },
   { id: "towerModel", label: "Model", group: "tower" },
-  { id: "equipment", label: "Equipment No. (Commercial)", group: "tower" },
+  { id: "equipment", label: "Customer Requires (Equipment No.)", group: "tower" },
   { id: "flowType", label: "Counterflow / Crossflow / Closed Circuit", group: "tower", options: FLOW_TYPES },
   ...SPEC_ROWS.filter((row) => (SCANNED_SPEC_KEYS as readonly string[]).includes(row.key)).map(
     (row): ScanField => ({ id: row.key as ScanFieldId, label: row.label, group: "tower" })
@@ -120,7 +120,7 @@ export function currentScanValue(data: ProposalData, id: ScanFieldId, index: num
     case "flowType":
       return index === 0 ? data.flowType : (tower?.flowType ?? "");
     case "equipment":
-      return tower?.equipment ?? "";
+      return towerSpec(data, index).customerRequires;
     case "basin":
       return tower?.basin ?? "";
     case "shape":
@@ -195,7 +195,7 @@ export function applyScan(
       if (!(FLOW_TYPES as readonly string[]).includes(value)) continue;
       if (index === 0) top.flowType = value as FlowType;
       else tower.flowType = value as FlowType;
-    } else if (id === "equipment") tower.equipment = value;
+    } else if (id === "equipment") spec.customerRequires = value;
     else if (id === "basin") tower.basin = value;
     else if (id === "attention") attention = value;
     else if (id === "shape") extra.shape = value;
