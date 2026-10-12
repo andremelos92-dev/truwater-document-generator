@@ -2,6 +2,7 @@ import {
   EMPTY_SUMMARY_EXTRA,
   projectTitle,
   resolvedCommercialTowers,
+  towerScope,
   towerSpec,
   type FlowType,
   type ProposalData,
@@ -15,6 +16,8 @@ export type SummaryTower = {
   rows: [label: string, value: string][];
   /** Form fields the table needs that are still blank. */
   missing: string[];
+  /** This tower type's Materials of Construction, printed under its table when the towers' lists differ. */
+  materials: string[];
 };
 
 export type SelectionSummary = {
@@ -26,6 +29,7 @@ export type SelectionSummary = {
   /** Email-level fields that are still blank (shown as a warning, not printed). */
   missing: string[];
   towers: SummaryTower[];
+  /** Materials of Construction printed once after all the towers: set only when every tower's list is the same. */
   materials: string[];
   closing: string;
 };
@@ -77,6 +81,30 @@ function formatDimensions(value: string): string {
   if (!parts) return withUnit(value, "mm");
   const [length, width, height] = parts;
   return [`${length} L`, `${width} W`, height && `${height} H`].filter(Boolean).join(" x ");
+}
+
+/** Tower type `index`'s Materials of Construction, from its specification and Scope of Supply. */
+function towerMaterials(data: ProposalData, index: number): string[] {
+  const truwater = towerScope(data, index).filter((item) => item.responsibility === "Truwater");
+  const scopeLine = (match: RegExp, label: string) => {
+    const material = truwater.find((item) => match.test(item.description.trim()))?.material?.trim();
+    return material ? `${material} ${label}` : "";
+  };
+  const casing = towerSpec(data, index).casingMaterial.trim();
+  // Same rule as the Commercial Proposal: a blank basin is the material of construction.
+  const basin = data.commercial.towers[index]?.basin.trim() || casing;
+  const [framework, fanCylinder, ...rest] = SCOPE_MATERIALS.map(({ match, label }) => scopeLine(match, label));
+  const [basinSupport, mechanical, wetted, nonWetted] = rest;
+  return [
+    framework,
+    casing && `${casing} Casing`,
+    fanCylinder,
+    basin && `${basin} Cold Water Basin`,
+    basinSupport,
+    mechanical,
+    wetted,
+    nonWetted,
+  ].filter(Boolean);
 }
 
 /** "1 per tower" fans + "22" kW -> "1 x 22 kW per tower". */
@@ -135,29 +163,13 @@ export function buildSelectionSummary(data: ProposalData, attach: SummaryAttachm
       // Blank rows are left out of the email (and listed as missing).
       rows: rows.filter(([, value]) => value).map(([label, value]) => [label, value]),
       missing,
+      materials: towerMaterials(data, index),
     };
   });
 
-  const truwater = data.commercial.scope.filter((item) => item.responsibility === "Truwater");
-  const scopeLine = (match: RegExp, label: string) => {
-    const material = truwater.find((item) => match.test(item.description.trim()))?.material?.trim();
-    return material ? `${material} ${label}` : "";
-  };
-  const casing = data.spec.casingMaterial.trim();
-  // Same rule as the Commercial Proposal: a blank basin is the material of construction.
-  const basin = data.commercial.towers[0]?.basin.trim() || casing;
-  const [framework, fanCylinder, ...rest] = SCOPE_MATERIALS.map(({ match, label }) => scopeLine(match, label));
-  const [basinSupport, mechanical, wetted, nonWetted] = rest;
-  const materials = [
-    framework,
-    casing && `${casing} Casing`,
-    fanCylinder,
-    basin && `${basin} Cold Water Basin`,
-    basinSupport,
-    mechanical,
-    wetted,
-    nonWetted,
-  ].filter(Boolean);
+  // Towers with the same materials share one list at the end; otherwise each tower lists its own.
+  const sameMaterials = towers.every((tower) => tower.materials.join("|") === towers[0]?.materials.join("|"));
+  const materials = sameMaterials ? (towers[0]?.materials ?? []) : [];
 
   // "Dear John," from the contact's first name.
   const firstName = data.contactName.trim().split(/\s+/)[0] ?? "";
@@ -184,6 +196,17 @@ const escapeHtml = (value: string) =>
 const FONT = "font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;color:#000000;";
 const CELL = "border:1px solid #000000;padding:1pt 5pt;vertical-align:top;";
 
+const materialsHtml = (lines: string[]) =>
+  lines.length
+    ? `<p style="margin:12pt 0 6pt 0;"><b style="font-size:12pt;">Materials of Construction</b></p>` +
+      `<ul style="margin:0 0 12pt 0;padding-left:24pt;">` +
+      lines.map((line) => `<li style="margin:0 0 2pt 0;">${escapeHtml(line)}</li>`).join("") +
+      `</ul>`
+    : "";
+
+/** True when each tower prints its own Materials of Construction (the towers' lists differ). */
+const perTowerMaterials = (summary: SelectionSummary) => summary.materials.length === 0;
+
 /** Email-ready HTML with inline styles, so the layout survives pasting into Outlook or Gmail. */
 export function selectionSummaryHtml(summary: SelectionSummary): string {
   const towers = summary.towers
@@ -199,15 +222,11 @@ export function selectionSummaryHtml(summary: SelectionSummary): string {
               `<td style="${CELL}width:150pt;">${escapeHtml(value)}</td></tr>`
           )
           .join("") +
-        `</table>`
+        `</table>` +
+        (perTowerMaterials(summary) ? materialsHtml(tower.materials) : "")
     )
     .join("");
-  const materials = summary.materials.length
-    ? `<p style="margin:12pt 0 6pt 0;"><b style="font-size:12pt;">Materials of Construction</b></p>` +
-      `<ul style="margin:0 0 12pt 0;padding-left:24pt;">` +
-      summary.materials.map((line) => `<li style="margin:0 0 2pt 0;">${escapeHtml(line)}</li>`).join("") +
-      `</ul>`
-    : "";
+  const materials = materialsHtml(summary.materials);
   const attachments = summary.attachments.length
     ? `<p style="margin:0 0 6pt 0;">Please find attached for your review:</p>` +
       `<ul style="margin:0 0 12pt 0;padding-left:24pt;">` +
@@ -230,14 +249,19 @@ export function selectionSummaryHtml(summary: SelectionSummary): string {
 /** Plain-text fallback for mail apps that don't take formatted text. */
 export function selectionSummaryText(summary: SelectionSummary): string {
   const width = Math.max(...summary.towers.flatMap((tower) => tower.rows.map(([label]) => label.length)), 0) + 2;
+  const materialsText = (lines: string[]) =>
+    lines.length ? ["Materials of Construction", ...lines.map((line) => `• ${line}`)].join("\n") : "";
   const towers = summary.towers.map((tower) =>
-    [tower.heading, tower.description, ...tower.rows.map(([label, value]) => `${label.padEnd(width)}${value}`)].join(
-      "\n"
-    )
+    [
+      [tower.heading, tower.description, ...tower.rows.map(([label, value]) => `${label.padEnd(width)}${value}`)].join(
+        "\n"
+      ),
+      perTowerMaterials(summary) ? materialsText(tower.materials) : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n")
   );
-  const materials = summary.materials.length
-    ? ["Materials of Construction", ...summary.materials.map((line) => `• ${line}`)].join("\n")
-    : "";
+  const materials = materialsText(summary.materials);
   const attachments = summary.attachments.length
     ? ["Please find attached for your review:", ...summary.attachments.map((name) => `• ${name}`)].join("\n")
     : "";
