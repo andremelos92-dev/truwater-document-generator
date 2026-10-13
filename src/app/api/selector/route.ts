@@ -1,6 +1,6 @@
 import { masterUser } from "@/lib/auth";
-import { listTables, writeTable } from "@/lib/selector-server";
-import { tableId, type MakerTable } from "@/lib/selector";
+import { deleteTable, listTables, writeTable } from "@/lib/selector-server";
+import { isTowerType, tableId, type MakerTable } from "@/lib/selector";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ export async function GET() {
   return Response.json({ tables: await listTables() });
 }
 
-/** POST /api/selector – body { maker, series, fileName, conditions, models }: stores (or replaces) a maker's table. */
+/** POST /api/selector – body { maker, series, towerType, fileName, conditions, models }: stores (or replaces) a maker's table. */
 export async function POST(request: Request) {
   if (!(await masterUser())) return notFound();
   const body = (await request.json().catch(() => null)) as Partial<MakerTable> | null;
@@ -22,16 +22,21 @@ export async function POST(request: Request) {
   if (!maker || !Array.isArray(body?.conditions) || !Array.isArray(body?.models) || body.models.length === 0) {
     return Response.json({ error: "Give the maker's name and a table with models." }, { status: 400 });
   }
+  if (!isTowerType(body.towerType)) return Response.json({ error: "Choose the tower type." }, { status: 400 });
+  const towerType = body.towerType;
   const table: MakerTable = {
-    id: tableId(maker, series),
+    id: tableId(maker, series, towerType),
     maker,
     series,
+    towerType,
     fileName: body.fileName?.trim() ?? "",
     addedAt: new Date().toISOString(),
     conditions: body.conditions,
     models: body.models,
   };
   await writeTable(table);
+  // The same maker and series saved before tower types (stored without the type) is replaced by this one.
+  await deleteTable(tableId(maker, series)).catch(() => {});
   const { conditions: _conditions, models, ...info } = table;
   return Response.json({ table: { ...info, modelCount: models.length } });
 }

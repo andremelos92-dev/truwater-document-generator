@@ -1,20 +1,38 @@
 import { estimateFlow, type CtiTable, type Estimate } from "@/lib/cti";
 
+/** The kinds of tower a maker's table can be for; each is selected separately. */
+export const TOWER_TYPES = [
+  { id: "counterflow", label: "Counterflow" },
+  { id: "crossflow", label: "Crossflow" },
+  { id: "closed-circuit", label: "Closed circuit" },
+] as const;
+
+export type TowerType = (typeof TOWER_TYPES)[number]["id"];
+
+export const isTowerType = (value: unknown): value is TowerType => TOWER_TYPES.some((t) => t.id === value);
+
+/** Tables saved before tower types were added are counterflow (Truwater EC-S, EVAPCO AT/UT/USS). */
+export const towerTypeOf = (table: { towerType?: TowerType }): TowerType => table.towerType ?? "counterflow";
+
+export const towerTypeLabel = (type: TowerType) => TOWER_TYPES.find((t) => t.id === type)!.label;
+
 /** A maker's CTI performance table as stored for the Tower Selector. */
 export type MakerTable = CtiTable & {
   id: string;
   maker: string;
   /** e.g. "AT / UT / USS". */
   series: string;
+  /** Missing on tables saved before tower types: counterflow. */
+  towerType?: TowerType;
   fileName: string;
   addedAt: string; // ISO date
 };
 
 export type MakerTableInfo = Omit<MakerTable, "conditions" | "models"> & { modelCount: number };
 
-/** "Evapco" + "AT" -> "evapco-at". */
-export function tableId(maker: string, series: string): string {
-  return `${maker}-${series}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80) || "table";
+/** "Evapco" + "AT" -> "evapco-at"; with a tower type, "crossflow-evapco-at". */
+export function tableId(maker: string, series: string, towerType?: TowerType): string {
+  return [towerType, maker, series].filter(Boolean).join("-").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80) || "table";
 }
 
 /** What a model name tells about the tower (the CTI table only has flows). */
@@ -249,6 +267,22 @@ export function recommend(ranked: Candidate[], minMargin: number): Recommendatio
     smallest: smallest && smallest !== best ? smallest : undefined,
     lowestPower: lowestPower && lowestPower !== best && lowestPower !== smallest ? lowestPower : undefined,
   };
+}
+
+/**
+ * Each maker's best tower (first in the ranked list with at least the minimum margin), for comparing makers.
+ * A maker with nothing that has the margin gets its closest tower, or null when nothing of theirs cools the duty.
+ */
+export function bestPerMaker(
+  ranked: Candidate[],
+  makers: string[],
+  minMargin: number
+): { maker: string; pick: Candidate | null; short: boolean }[] {
+  return makers.map((maker) => {
+    const own = ranked.filter((c) => c.maker === maker);
+    const pick = own.find((c) => c.margin >= minMargin) ?? own[0] ?? null;
+    return { maker, pick, short: !!pick && pick.margin < minMargin };
+  });
 }
 
 /** How a tower compares with the numbers typed, e.g. "Plan 5,486 × 3,658 mm (your space 3,651 × 3,607)". */

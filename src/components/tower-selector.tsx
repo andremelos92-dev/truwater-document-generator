@@ -12,17 +12,22 @@ import { parseCtiTable, type CtiTable } from "@/lib/cti";
 import { parseScan, toLines } from "@/lib/scan-parse";
 import { readDocument } from "@/lib/scan-source";
 import {
+  bestPerMaker,
   dutyProblem,
   matchNotes,
   planArea,
   rankTowers,
   recommend,
   selectTowers,
+  TOWER_TYPES,
   totalKw,
+  towerTypeLabel,
+  towerTypeOf,
   type Candidate,
   type Duty,
   type MakerTable,
   type MakerTableInfo,
+  type TowerType,
 } from "@/lib/selector";
 import { cn } from "@/lib/utils";
 
@@ -89,9 +94,15 @@ export function TowerSelector() {
   const [shown, setShown] = useState(PAGE);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "error" | "info"; text: string } | null>(null);
-  const [pending, setPending] = useState<{ fileName: string; table: CtiTable; maker: string; series: string } | null>(
-    null
-  );
+  /** Only tables of this type are selected from. */
+  const [towerType, setTowerType] = useState<TowerType>("counterflow");
+  const [pending, setPending] = useState<{
+    fileName: string;
+    table: CtiTable;
+    maker: string;
+    series: string;
+    towerType: TowerType;
+  } | null>(null);
   const rfqRef = useRef<HTMLInputElement>(null);
   const tableRef = useRef<HTMLInputElement>(null);
 
@@ -125,25 +136,33 @@ export function TowerSelector() {
     maxWidthMm: numberIn(values.maxWidthMm),
   };
   const problem = dutyProblem(duty);
-  // A CTI doc that's attached but not saved yet is used straight away.
+  // The tables of the chosen tower type; a CTI doc that's attached but not saved yet is used straight away.
   const loadedTables = useMemo(
     () => [
-      ...Object.values(tables),
-      ...(pending
+      ...Object.values(tables).filter((table) => towerTypeOf(table) === towerType),
+      ...(pending && pending.towerType === towerType
         ? [
             {
               ...pending.table,
               id: "attached",
               maker: pending.maker.trim() || "Attached CTI doc",
               series: pending.series,
+              towerType: pending.towerType,
               fileName: pending.fileName,
               addedAt: "",
             },
           ]
         : []),
     ],
-    [tables, pending]
+    [tables, pending, towerType]
   );
+  /** Makers with a table of the chosen type, for comparing their selections. */
+  const makers = useMemo(() => [...new Set(loadedTables.map((table) => table.maker))].sort(), [loadedTables]);
+  const typeCounts = useMemo(() => {
+    const counts: Partial<Record<TowerType, number>> = {};
+    for (const info of infos ?? []) counts[towerTypeOf(info)] = (counts[towerTypeOf(info)] ?? 0) + 1;
+    return counts;
+  }, [infos]);
 
   const margin = numberIn(minMargin) ?? 0;
   const results = useMemo(
@@ -205,7 +224,7 @@ export function TowerSelector() {
     setMessage(null);
     try {
       const table = parseCtiTable(await readDocument(file, () => {}, { maxPages: 500 }));
-      setPending({ fileName: file.name, table, maker: makerFromFile(file.name), series: "" });
+      setPending({ fileName: file.name, table, maker: makerFromFile(file.name), series: "", towerType });
     } catch (err) {
       console.error(err);
       setMessage({ tone: "error", text: err instanceof Error ? err.message : "The table couldn't be read." });
@@ -220,9 +239,18 @@ export function TowerSelector() {
     try {
       await call("/api/selector", {
         method: "POST",
-        body: JSON.stringify({ maker: pending.maker, series: pending.series, fileName: pending.fileName, ...pending.table }),
+        body: JSON.stringify({
+          maker: pending.maker,
+          series: pending.series,
+          towerType: pending.towerType,
+          fileName: pending.fileName,
+          ...pending.table,
+        }),
       });
-      setMessage({ tone: "info", text: `Saved ${pending.table.models.length} ${pending.maker} models.` });
+      setMessage({
+        tone: "info",
+        text: `Saved ${pending.table.models.length} ${pending.maker} ${towerTypeLabel(pending.towerType).toLowerCase()} models.`,
+      });
       setPending(null);
       await refresh();
     } catch (err) {
@@ -233,7 +261,8 @@ export function TowerSelector() {
   }
 
   async function removeTable(info: MakerTableInfo) {
-    if (!window.confirm(`Delete the ${info.maker} ${info.series} table? You can upload it again later.`)) return;
+    const name = [info.maker, info.series, towerTypeLabel(towerTypeOf(info)).toLowerCase()].filter(Boolean).join(" ");
+    if (!window.confirm(`Delete the ${name} table? You can upload it again later.`)) return;
     setBusy(info.id);
     try {
       await call(`/api/selector/${info.id}`, { method: "DELETE" });
@@ -251,6 +280,37 @@ export function TowerSelector() {
 
   return (
     <div className="grid gap-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm font-semibold">Tower type</span>
+        <div role="radiogroup" aria-label="Tower type" className="bg-muted inline-flex flex-wrap gap-1 rounded-lg p-1">
+          {TOWER_TYPES.map((type) => {
+            const active = type.id === towerType;
+            const count = typeCounts[type.id] ?? 0;
+            return (
+              <button
+                key={type.id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => {
+                  setTowerType(type.id);
+                  setShown(PAGE);
+                }}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {type.label}
+                <span className="text-muted-foreground ml-1.5 text-xs font-normal">
+                  {count} {count === 1 ? "table" : "tables"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <Card>
         <CardHeader className="grid-cols-[minmax(0,1fr)_auto]">
           <CardTitle>Duty</CardTitle>
@@ -375,10 +435,11 @@ export function TowerSelector() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Tower to use</CardTitle>
+          <CardTitle>{towerTypeLabel(towerType)} tower to use</CardTitle>
           <CardDescription>
-            The best match for the duty and the numbers typed. Motor and plan size come from the model name (nominal,
-            rounded up to whole feet).
+            The best match for the duty and the numbers typed, from the {towerTypeLabel(towerType).toLowerCase()} tables,
+            and each maker&apos;s selection side by side. Motor and plan size come from the model name (nominal, rounded
+            up to whole feet).
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0">
@@ -387,7 +448,10 @@ export function TowerSelector() {
               <Loader2 className="size-4 animate-spin" /> Loading maker tables…
             </p>
           ) : loadedTables.length === 0 ? (
-            <p className="text-muted-foreground px-6 text-sm">Type the duty and attach a maker&apos;s CTI doc (“Attach CTI doc” above) to get the tower.</p>
+            <p className="text-muted-foreground px-6 text-sm">
+              No {towerTypeLabel(towerType).toLowerCase()} tables yet. Attach a maker&apos;s CTI doc (“Attach CTI doc”
+              above) or add one under Maker tables to get the tower.
+            </p>
           ) : problem ? (
             <p className="text-muted-foreground px-6 text-sm">{problem}</p>
           ) : results.length === 0 ? (
@@ -397,6 +461,7 @@ export function TowerSelector() {
           ) : (
             <>
             <RecommendationPanel recommendation={recommendation} minMargin={margin} duty={duty as Duty} />
+            <MakerComparison picks={bestPerMaker(results, makers, margin)} minMargin={margin} />
             <p className="px-6 pb-2 text-sm font-semibold">Every tower that cools the duty, best match first</p>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
@@ -498,10 +563,26 @@ export function TowerSelector() {
             <div className="grid gap-3 rounded-lg border p-3">
               <p className="text-sm">
                 <span className="font-medium">{pending.fileName}</span>: {pending.table.models.length} models,{" "}
-                {pending.table.conditions.length} rating conditions. Already used for the tower above; save it to keep it for
-                next time.
+                {pending.table.conditions.length} rating conditions.{" "}
+                {pending.towerType === towerType
+                  ? "Already used for the tower above; save it to keep it for next time."
+                  : `Used when ${towerTypeLabel(pending.towerType)} is chosen at the top; save it to keep it for next time.`}
               </p>
-              <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+              <div className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pending-type">Tower type</Label>
+                  <NativeSelect
+                    id="pending-type"
+                    value={pending.towerType}
+                    onChange={(event) => setPending({ ...pending, towerType: event.target.value as TowerType })}
+                  >
+                    {TOWER_TYPES.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
                 <div className="grid gap-1.5">
                   <Label htmlFor="pending-maker">Maker</Label>
                   <Input
@@ -530,32 +611,43 @@ export function TowerSelector() {
                 </div>
               </div>
               <p className="text-muted-foreground text-xs">
-                Saving under the same maker and series replaces that table.
+                Saving under the same maker, series and tower type replaces that table.
               </p>
             </div>
           )}
           {infos && infos.length > 0 ? (
             <ul className="divide-y rounded-lg border">
-              {infos.map((info) => (
-                <li key={info.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="font-medium">{[info.maker, info.series].filter(Boolean).join(" · ")}</p>
-                    <p className="text-muted-foreground truncate text-xs">
-                      {info.modelCount} models · {info.fileName} · added {dateFormat.format(new Date(info.addedAt))}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`Delete the ${info.maker} table`}
-                    disabled={!!busy}
-                    onClick={() => void removeTable(info)}
-                  >
-                    {busy === info.id ? <Loader2 className="animate-spin" /> : <Trash2 />}
-                  </Button>
-                </li>
-              ))}
+              {[...infos]
+                .sort(
+                  (a, b) =>
+                    TOWER_TYPES.findIndex((t) => t.id === towerTypeOf(a)) -
+                    TOWER_TYPES.findIndex((t) => t.id === towerTypeOf(b))
+                )
+                .map((info) => (
+                  <li key={info.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-center gap-2 font-medium">
+                        {[info.maker, info.series].filter(Boolean).join(" · ")}
+                        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-normal">
+                          {towerTypeLabel(towerTypeOf(info))}
+                        </span>
+                      </p>
+                      <p className="text-muted-foreground truncate text-xs">
+                        {info.modelCount} models · {info.fileName} · added {dateFormat.format(new Date(info.addedAt))}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Delete the ${info.maker} table`}
+                      disabled={!!busy}
+                      onClick={() => void removeTable(info)}
+                    >
+                      {busy === info.id ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                    </Button>
+                  </li>
+                ))}
             </ul>
           ) : (
             infos && !pending && <p className="text-muted-foreground text-sm">No maker tables yet.</p>
@@ -588,6 +680,35 @@ function Pick({ label, candidate, highlight }: { label: string; candidate: Candi
           {area !== undefined && ` · ${fmtNumber(d.lengthMm, 0)} × ${fmtNumber(d.widthMm, 0)} mm`}
         </p>
       )}
+    </div>
+  );
+}
+
+/** Each maker's own selection for the duty side by side, e.g. Truwater's tower next to Evapco's. */
+function MakerComparison({ picks, minMargin }: { picks: ReturnType<typeof bestPerMaker>; minMargin: number }) {
+  if (picks.length < 2) return null;
+  return (
+    <div className="mx-6 mb-6 grid gap-2 border-t pt-4">
+      <p className="text-sm font-semibold">Compare makers</p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {picks.map(({ maker, pick, short }) =>
+          pick ? (
+            <div key={maker} className="grid content-start gap-1">
+              <Pick label={`${maker} selection`} candidate={pick} />
+              {short && (
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  Less than {fmtNumber(minMargin)}% spare: {maker}&apos;s closest.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div key={maker} className="text-muted-foreground grid content-start gap-1 rounded-lg border border-dashed p-3">
+              <p className="text-xs font-medium tracking-wide uppercase">{maker} selection</p>
+              <p className="text-sm">No {maker} model cools this duty.</p>
+            </div>
+          )
+        )}
+      </div>
     </div>
   );
 }
