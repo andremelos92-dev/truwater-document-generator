@@ -22,7 +22,7 @@ Open http://localhost:3000. The sidebar has:
 
 - **Dashboard** (`/`): quick links to start a document and, later, recent documents
 - **Documents** (`/documents`): shared RFQ and Technical Proposal fields, plus a Commercial Proposal tab; each document can be downloaded as Word
-- **History** (`/history`): saved projects, one per TTA quote number (the latest "Save project", stored compressed in Vercel Blob under `projects/`); Load fills the whole form again
+- **History** (`/history`): saved projects, one per TTA quote number. Every "Save project" is kept as a version (compressed, in Vercel Blob under `projects/<quote>/`) with notes of what changed; each project and version opens from its own link, `/documents?project=TTA0160` (latest) or `&version=<id>`
 - **Account**: reserved for login (coming soon)
 
 Sidebar items are listed in `NAV_ITEMS` in `src/components/app-shell.tsx`.

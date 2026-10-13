@@ -1,6 +1,6 @@
 "use client";
 
-import type { ProjectEntry } from "@/lib/history";
+import type { ProjectSummary, ProjectVersion } from "@/lib/history";
 import type { ProposalData } from "@/lib/proposal";
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -12,13 +12,17 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export type SaveResult = { key: string; version?: ProjectVersion; unchanged?: boolean };
+
 export const historyApi = {
-  list: () => call<{ entries: ProjectEntry[] }>("/api/history").then((r) => r.entries),
+  projects: () => call<{ projects: ProjectSummary[] }>("/api/history").then((r) => r.projects),
+  versions: (key: string) => call<{ versions: ProjectVersion[] }>(`/api/history/${key}`).then((r) => r.versions),
   save: (data: ProposalData) =>
-    call<{ entry: ProjectEntry }>("/api/history", {
-      method: "POST",
-      body: JSON.stringify({ data }),
-    }).then((r) => r.entry),
-  load: (id: string) => call<Partial<ProposalData>>(`/api/history/${id}`),
-  remove: (id: string) => call<{ ok: true }>(`/api/history/${id}`, { method: "DELETE" }),
+    call<SaveResult>("/api/history", { method: "POST", body: JSON.stringify({ data }) }),
+  /** A save's form data; "latest" is the project's newest save. */
+  load: (key: string, version = "latest") =>
+    call<{ id: string; data: Partial<ProposalData> }>(`/api/history/${key}/${version}`),
+  removeProject: (key: string) => call<{ ok: true }>(`/api/history/${key}`, { method: "DELETE" }),
+  removeVersion: (key: string, version: string) =>
+    call<{ ok: true }>(`/api/history/${key}/${version}`, { method: "DELETE" }),
 };

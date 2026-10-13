@@ -1,37 +1,25 @@
-import { gzipSync } from "node:zlib";
-import { del, list, put } from "@vercel/blob";
-
-import { historyTitle, projectKey, restoreProposal, type ProjectEntry } from "@/lib/history";
-import { decodeTitle, encodeTitle, PROJECTS_PREFIX, projectId, projectPath } from "@/lib/history-server";
+import { describeChanges } from "@/lib/history-changes";
+import { historyTitle, projectKey, restoreProposal, type ProjectSummary, type ProjectVersion } from "@/lib/history";
+import { encodeTitle, listVersions, readNotes, readVersion, writeNotes, writeVersion } from "@/lib/history-server";
 import type { ProposalData } from "@/lib/proposal";
 
 export const dynamic = "force-dynamic";
 
-/** Every saved file under `prefix`. */
-async function listAll(prefix: string) {
-  const blobs: { pathname: string; uploadedAt: Date }[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await list({ prefix, cursor });
-    blobs.push(...page.blobs);
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-  return blobs;
-}
-
-/** GET /api/history – saved projects, newest first. */
+/** GET /api/history – saved projects (latest name and save, number of saves), most recently saved first. */
 export async function GET() {
-  const entries: ProjectEntry[] = (await listAll(PROJECTS_PREFIX)).map((blob) => {
-    const id = projectId(blob.pathname);
-    return { id, title: decodeTitle(id.slice(id.indexOf("_") + 1)), savedAt: new Date(blob.uploadedAt).toISOString() };
-  });
-  entries.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
-  return Response.json({ entries });
+  const projects = new Map<string, ProjectSummary>();
+  // Oldest first, so each project ends on its latest save.
+  for (const file of await listVersions()) {
+    const versions = (projects.get(file.key)?.versions ?? 0) + 1;
+    projects.set(file.key, { key: file.key, title: file.title, savedAt: file.savedAt, versions });
+  }
+  const list = [...projects.values()].sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  return Response.json({ projects: list });
 }
 
 /**
- * POST /api/history – body { data }: saves the whole form, compressed, as the project's latest version. A project
- * is its TTA quote number, so saving again replaces it (and any older copy saved under another project name).
+ * POST /api/history – body { data }: saves the whole form as a new version of its project (its TTA quote
+ * number), noting what changed since the last save. Nothing is saved when nothing changed.
  */
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as { data?: ProposalData } | null;
@@ -43,18 +31,18 @@ export async function POST(request: Request) {
   const key = projectKey(data.quoteNumber);
   if (!key) return Response.json({ error: "Fill in the TTA Quote Number first." }, { status: 400 });
 
-  const title = historyTitle(data);
-  const id = `${key}_${encodeTitle(title)}`;
-  const pathname = projectPath(id);
-  await put(pathname, gzipSync(JSON.stringify(body.data)), {
-    access: "private",
-    contentType: "application/gzip",
-    allowOverwrite: true,
-  });
-  // The same quote saved under an older project name.
-  const older = (await listAll(`${PROJECTS_PREFIX}${key}_`)).filter((blob) => blob.pathname !== pathname);
-  if (older.length) await del(older.map((blob) => blob.pathname));
+  const latest = (await listVersions(key)).at(-1);
+  const previous = latest && (await readVersion(key, latest.id));
+  const changes = previous ? describeChanges(restoreProposal(previous as Partial<ProposalData>), data) : ["First save"];
+  if (changes.length === 0) {
+    return Response.json({ unchanged: true, key });
+  }
 
-  const entry: ProjectEntry = { id, title, savedAt: new Date().toISOString() };
-  return Response.json({ entry });
+  const title = historyTitle(data);
+  const id = `${Date.now()}_${encodeTitle(title)}`;
+  await writeVersion(key, id, body.data);
+  await writeNotes(key, { ...(await readNotes(key)), [id]: changes });
+
+  const version: ProjectVersion = { id, title, savedAt: new Date(Number(id.split("_")[0])).toISOString(), changes };
+  return Response.json({ key, version });
 }

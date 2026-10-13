@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
-import { Eye, FileDown, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Eye, FileDown, FolderOpen, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { CommercialProposal } from "@/components/commercial-proposal";
 import { InquiryForm } from "@/components/inquiry-form";
@@ -31,7 +31,8 @@ import {
   type Recipient,
   type SpecKey,
 } from "@/lib/proposal";
-import { LOAD_KEY, restoreProposal } from "@/lib/history";
+import { historyTitle, restoreProposal } from "@/lib/history";
+import { historyApi } from "@/lib/history-client";
 import { DOCUMENTS, generateDocument, type DocumentKind } from "@/lib/templates";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,8 @@ const RECIPIENT_OPTIONS: { value: Recipient; label: string }[] = [
 ];
 
 const ASAP = "ASAP";
+
+const OPENED_DATE = new Intl.DateTimeFormat("en-AU", { dateStyle: "medium", timeStyle: "short" });
 
 const TABS = [
   { id: "documents", label: "RFQ & Technical Proposal" },
@@ -98,20 +101,30 @@ export function ProposalForm() {
   const [scanMarks, setScanMarks] = useState<ScanMarks | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // A project loaded on the History page arrives here once, then is cleared.
+  /** The saved project shown, when opened from History: "loading", or what was opened. */
+  const [opened, setOpened] = useState<"loading" | { title: string; savedAt: Date; latest: boolean } | null>(null);
+
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
     // The dashboard links straight to a tab with ?tab=commercial or ?tab=inquiry.
-    const tab = new URLSearchParams(window.location.search).get("tab");
+    const tab = params.get("tab");
     if (tab === "commercial" || tab === "inquiry") setActiveTab(tab);
-    try {
-      const stored = sessionStorage.getItem(LOAD_KEY);
-      if (!stored) return;
-      sessionStorage.removeItem(LOAD_KEY);
-      const { data: saved } = JSON.parse(stored);
-      setData(restoreProposal(saved));
-    } catch {
-      // Ignore a malformed hand-over; the form simply starts empty.
-    }
+    // A saved project opens from its link: ?project=TTA0160 (latest save) or with &version=<id>.
+    const project = params.get("project");
+    if (!project) return;
+    const version = params.get("version") ?? undefined;
+    setOpened("loading");
+    historyApi
+      .load(project, version)
+      .then(({ id, data: saved }) => {
+        const restored = restoreProposal(saved);
+        setData(restored);
+        setOpened({ title: historyTitle(restored), savedAt: new Date(Number(id.split("_")[0])), latest: !version });
+      })
+      .catch((err) => {
+        setOpened(null);
+        setError(err instanceof Error ? err.message : "Could not open that project.");
+      });
   }, []);
   const isAsap = data.dateQuoteRequired === ASAP;
 
@@ -205,6 +218,24 @@ export function ProposalForm() {
 
   return (
     <div className="grid gap-6">
+      {opened && (
+        <p className="bg-muted/60 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-3 py-2 text-sm">
+          {opened === "loading" ? (
+            <>
+              <Loader2 className="size-4 animate-spin" /> Opening the saved project…
+            </>
+          ) : (
+            <>
+              <FolderOpen className="text-muted-foreground size-4" />
+              <span>
+                Opened <span className="font-medium">{opened.title}</span> —{" "}
+                {opened.latest ? "latest save" : "save"} of {OPENED_DATE.format(opened.savedAt)}.
+              </span>
+              <span className="text-muted-foreground">“Save project” keeps your changes as a new version.</span>
+            </>
+          )}
+        </p>
+      )}
       <div className="flex border-b" role="tablist" aria-label="Document sections">
         {TABS.map((tab) => (
           <button
