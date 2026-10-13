@@ -4,28 +4,15 @@ import { useState } from "react";
 import { Check, Loader2, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { NativeSelect } from "@/components/ui/native-select";
-import { HISTORY_KINDS, type HistoryKind } from "@/lib/history";
 import { historyApi } from "@/lib/history-client";
+import { historyTitle } from "@/lib/history";
 import type { ProposalData } from "@/lib/proposal";
 
-// Saving to History is switched off while the tool is being tested; set to true to turn it back on.
-const SAVING_ENABLED = false;
-
-type SaveToHistoryProps = { data: ProposalData; kinds: HistoryKind[] };
-
-export function SaveToHistory(props: SaveToHistoryProps) {
-  if (SAVING_ENABLED) return <SaveToHistoryControls {...props} />;
-  return (
-    <Button type="button" variant="outline" size="lg" disabled title="Saving to History is coming soon">
-      <Save /> Save · Coming soon
-    </Button>
-  );
-}
-
-/** Saves the whole form to History under one of the given tabs. */
-function SaveToHistoryControls({ data, kinds }: SaveToHistoryProps) {
-  const [kind, setKind] = useState<HistoryKind>(kinds[0]);
+/**
+ * Saves the whole form (RFQ, Technical, Commercial and Inquiry) as the project's latest version in History.
+ * The project is its TTA quote number, so saving again replaces the earlier save.
+ */
+export function SaveToHistory({ data }: { data: ProposalData }) {
   const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -33,11 +20,11 @@ function SaveToHistoryControls({ data, kinds }: SaveToHistoryProps) {
     setState("saving");
     setError(null);
     try {
-      await historyApi.save(kind, data);
+      await historyApi.save(data);
       setState("saved");
       setTimeout(() => setState("idle"), 2500);
-    } catch {
-      setError("Could not save. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save. Please try again.");
       setState("idle");
     }
   }
@@ -45,23 +32,16 @@ function SaveToHistoryControls({ data, kinds }: SaveToHistoryProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {error && <span className="text-destructive text-sm">{error}</span>}
-      {kinds.length > 1 && (
-        <NativeSelect
-          aria-label="Save as"
-          value={kind}
-          onChange={(event) => setKind(event.target.value as HistoryKind)}
-          className="h-10 w-auto"
-        >
-          {kinds.map((id) => (
-            <option key={id} value={id}>
-              Save as {HISTORY_KINDS.find((k) => k.id === id)?.label}
-            </option>
-          ))}
-        </NativeSelect>
-      )}
-      <Button type="button" variant="outline" size="lg" onClick={save} disabled={state === "saving"}>
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
+        onClick={save}
+        disabled={state === "saving"}
+        title={`Save "${historyTitle(data)}" to History (replaces its last save)`}
+      >
         {state === "saving" ? <Loader2 className="animate-spin" /> : state === "saved" ? <Check /> : <Save />}
-        {state === "saved" ? "Saved" : "Save"}
+        {state === "saved" ? "Saved" : "Save project"}
       </Button>
     </div>
   );

@@ -576,7 +576,7 @@ export function CommercialProposal({
 
       {error && <p className="text-destructive text-sm" role="alert">{error}</p>}
       <div className="grid gap-2 sm:flex sm:justify-end sm:gap-3 [&_button]:w-full sm:[&_button]:w-auto">
-        <SaveToHistory data={data} kinds={["commercial"]} />
+        <SaveToHistory data={data} />
         <SelectionSummaryButton data={data} onExtrasChange={(selectionSummary) => onChange({ selectionSummary })} />
         <Button type="button" size="lg" variant="outline" disabled={!!generating} onClick={onPreview}>
           {generating === "preview" ? <Loader2 className="animate-spin" /> : <Eye />}

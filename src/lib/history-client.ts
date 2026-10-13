@@ -1,6 +1,6 @@
 "use client";
 
-import type { HistoryEntry, HistoryKind } from "@/lib/history";
+import type { ProjectEntry } from "@/lib/history";
 import type { ProposalData } from "@/lib/proposal";
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -13,12 +13,12 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const historyApi = {
-  list: (kind: HistoryKind) => call<{ entries: HistoryEntry[] }>(`/api/history?kind=${kind}`).then((r) => r.entries),
-  save: (kind: HistoryKind, data: ProposalData) =>
-    call<{ entry: HistoryEntry }>("/api/history", {
+  list: () => call<{ entries: ProjectEntry[] }>("/api/history").then((r) => r.entries),
+  save: (data: ProposalData) =>
+    call<{ entry: ProjectEntry }>("/api/history", {
       method: "POST",
-      body: JSON.stringify({ kind, data }),
+      body: JSON.stringify({ data }),
     }).then((r) => r.entry),
-  load: (kind: HistoryKind, id: string) => call<Partial<ProposalData>>(`/api/history/${kind}/${id}`),
-  remove: (kind: HistoryKind, id: string) => call<{ ok: true }>(`/api/history/${kind}/${id}`, { method: "DELETE" }),
+  load: (id: string) => call<Partial<ProposalData>>(`/api/history/${id}`),
+  remove: (id: string) => call<{ ok: true }>(`/api/history/${id}`, { method: "DELETE" }),
 };

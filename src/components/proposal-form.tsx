@@ -98,7 +98,7 @@ export function ProposalForm() {
   const [scanMarks, setScanMarks] = useState<ScanMarks | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // An entry loaded on the History page arrives here once, then is cleared.
+  // A project loaded on the History page arrives here once, then is cleared.
   useEffect(() => {
     // The dashboard links straight to a tab with ?tab=commercial or ?tab=inquiry.
     const tab = new URLSearchParams(window.location.search).get("tab");
@@ -107,9 +107,8 @@ export function ProposalForm() {
       const stored = sessionStorage.getItem(LOAD_KEY);
       if (!stored) return;
       sessionStorage.removeItem(LOAD_KEY);
-      const { kind, data: saved } = JSON.parse(stored);
+      const { data: saved } = JSON.parse(stored);
       setData(restoreProposal(saved));
-      if (kind === "commercial") setActiveTab("commercial");
     } catch {
       // Ignore a malformed hand-over; the form simply starts empty.
     }
@@ -598,7 +597,7 @@ export function ProposalForm() {
         >
           <RotateCcw /> Reset
         </Button>
-        <SaveToHistory data={data} kinds={["rfq", "proposal"]} />
+        <SaveToHistory data={data} />
         <SelectionSummaryButton
           data={data}
           onExtrasChange={(selectionSummary) => setData((prev) => ({ ...prev, selectionSummary }))}
