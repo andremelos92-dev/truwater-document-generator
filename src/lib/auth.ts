@@ -111,4 +111,10 @@ export async function currentUser(): Promise<Username | null> {
   return session ? findUser(session.username) : null;
 }
 
+/** The signed-in user when it's the master account, else null (for master-only pages and APIs). */
+export async function masterUser(): Promise<Username | null> {
+  const user = await currentUser();
+  return user && USERS[user].master ? user : null;
+}
+
 export const authError = (message: string, status: number) => Response.json({ error: message }, { status });

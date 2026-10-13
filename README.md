@@ -23,6 +23,7 @@ Open http://localhost:3000. The sidebar has:
 - **Dashboard** (`/`): quick links to start a document and, later, recent documents
 - **Documents** (`/documents`): shared RFQ and Technical Proposal fields, plus a Commercial Proposal tab; each document can be downloaded as Word
 - **History** (`/history`): saved projects, one per TTA quote number. Every "Save project" is kept as a version (compressed, in Vercel Blob under `projects/<quote>/`) with notes of what changed; each project and version opens from its own link, `/documents?project=TTA0160` (latest) or `&version=<id>`
+- **Tower Selector** (`/selector`, master account only): finds the towers in each maker's CTI certified performance table (CTI_49 SI PDF, uploaded on the page and stored under `selector/tables/`) that cool a duty typed or scanned from the RFQ. Flows at the duty are fitted from the certified points (`src/lib/cti.ts`); motor and plan size come from the model name where the nomenclature is known (`modelDetails` in `src/lib/selector.ts`, EVAPCO AT/UT/USS so far)
 - **Account**: reserved for login (coming soon)
 
 Sidebar items are listed in `NAV_ITEMS` in `src/components/app-shell.tsx`.

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Calculator,
   FileText,
   History,
   LayoutDashboard,
@@ -24,12 +25,15 @@ type NavItem = {
   icon: LucideIcon;
   /** Shown greyed out with a "Soon" tag until the page exists. */
   comingSoon?: boolean;
+  /** Only listed for the master account (the page itself also checks). */
+  masterOnly?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Documents", href: "/documents", icon: FileText },
   { label: "History", href: "/history", icon: History },
+  { label: "Tower Selector", href: "/selector", icon: Calculator, masterOnly: true },
   { label: "Account", href: "/account", icon: UserRound },
 ];
 
@@ -46,12 +50,12 @@ function Logo() {
   );
 }
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function NavLinks({ onNavigate, master }: { onNavigate?: () => void; master: boolean }) {
   const pathname = usePathname();
 
   return (
     <nav className="grid gap-1 px-3">
-      {NAV_ITEMS.map(({ label, href, icon: Icon, comingSoon }) => {
+      {NAV_ITEMS.filter((item) => master || !item.masterOnly).map(({ label, href, icon: Icon, comingSoon }) => {
         const active = pathname === href;
         const content = (
           <>
@@ -112,7 +116,18 @@ function LogOutButton() {
 /** Dark sidebar navigation on desktop; a top bar with a slide-out menu on small screens. */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [master, setMaster] = useState(false);
   const pathname = usePathname();
+  const signedIn = pathname !== "/";
+
+  // Master-only links appear once the signed-in account is known.
+  useEffect(() => {
+    if (!signedIn) return;
+    fetch("/api/auth/me")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((me) => setMaster(Boolean(me?.master)))
+      .catch(() => setMaster(false));
+  }, [signedIn]);
 
   // The front (login) page has its own header and no navigation.
   if (pathname === "/") return <>{children}</>;
@@ -125,7 +140,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Logo />
         </div>
         <div className="flex-1 overflow-y-auto py-4">
-          <NavLinks />
+          <NavLinks master={master} />
         </div>
         <div className="border-t border-white/10 p-3">
           <LogOutButton />
@@ -154,7 +169,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => setMenuOpen(false)}
           />
           <div className="relative bg-[#1f2226] py-3 shadow-lg">
-            <NavLinks onNavigate={() => setMenuOpen(false)} />
+            <NavLinks master={master} onNavigate={() => setMenuOpen(false)} />
             <div className="mt-2 border-t border-white/10 px-3 pt-2">
               <LogOutButton />
             </div>
