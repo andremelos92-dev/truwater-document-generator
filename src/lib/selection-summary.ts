@@ -196,12 +196,22 @@ const escapeHtml = (value: string) =>
 const FONT = "font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;color:#000000;";
 const CELL = "border:1px solid #000000;padding:1pt 5pt;vertical-align:top;";
 
+/**
+ * One empty line between blocks, the way an email typed in Outlook is spaced: paragraphs and list items have
+ * no margins of their own, so pasting keeps the spacing.
+ */
+const BLANK = `<p style="margin:0;">&nbsp;</p>`;
+
+const para = (html: string) => `<p style="margin:0;">${html}</p>`;
+
+const list = (items: string[]) =>
+  `<ul style="margin:0;padding-left:24pt;">` +
+  items.map((item) => `<li style="margin:0;">${item}</li>`).join("") +
+  `</ul>`;
+
 const materialsHtml = (lines: string[]) =>
   lines.length
-    ? `<p style="margin:12pt 0 6pt 0;"><b style="font-size:12pt;">Materials of Construction</b></p>` +
-      `<ul style="margin:0 0 12pt 0;padding-left:24pt;">` +
-      lines.map((line) => `<li style="margin:0 0 2pt 0;">${escapeHtml(line)}</li>`).join("") +
-      `</ul>`
+    ? para(`<b style="font-size:12pt;">Materials of Construction</b>`) + BLANK + list(lines.map(escapeHtml)) + BLANK
     : "";
 
 /** True when each tower prints its own Materials of Construction (the towers' lists differ). */
@@ -212,9 +222,10 @@ export function selectionSummaryHtml(summary: SelectionSummary): string {
   const towers = summary.towers
     .map(
       (tower) =>
-        `<p style="margin:0;"><b>${escapeHtml(tower.heading)}</b></p>` +
-        `<p style="margin:0 0 6pt 0;">${escapeHtml(tower.description)}</p>` +
-        `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 14pt 0;${FONT}">` +
+        para(`<b>${escapeHtml(tower.heading)}</b>`) +
+        para(escapeHtml(tower.description)) +
+        BLANK +
+        `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0;${FONT}">` +
         tower.rows
           .map(
             ([label, value]) =>
@@ -223,25 +234,28 @@ export function selectionSummaryHtml(summary: SelectionSummary): string {
           )
           .join("") +
         `</table>` +
+        BLANK +
         (perTowerMaterials(summary) ? materialsHtml(tower.materials) : "")
     )
     .join("");
-  const materials = materialsHtml(summary.materials);
   const attachments = summary.attachments.length
-    ? `<p style="margin:0 0 6pt 0;">Please find attached for your review:</p>` +
-      `<ul style="margin:0 0 12pt 0;padding-left:24pt;">` +
-      summary.attachments.map((name) => `<li style="margin:0 0 2pt 0;"><b>${escapeHtml(name)}</b></li>`).join("") +
-      `</ul>`
+    ? para("Please find attached for your review:") +
+      BLANK +
+      list(summary.attachments.map((name) => `<b>${escapeHtml(name)}</b>`)) +
+      BLANK
     : "";
   return (
     `<div style="${FONT}">` +
-    `<p style="margin:0 0 12pt 0;">${escapeHtml(summary.greeting)}</p>` +
-    `<p style="margin:0 0 12pt 0;">Thank you for the opportunity to provide our proposal for <b>${escapeHtml(summary.project)}</b></p>` +
+    para(escapeHtml(summary.greeting)) +
+    BLANK +
+    para(`Thank you for the opportunity to provide our proposal for <b>${escapeHtml(summary.project)}</b>`) +
+    BLANK +
     attachments +
-    `<p style="margin:0 0 12pt 0;"><b style="font-size:12pt;">Selection Summary</b></p>` +
+    para(`<b style="font-size:12pt;">Selection Summary</b>`) +
+    BLANK +
     towers +
-    materials +
-    `<p style="margin:12pt 0 0 0;">${escapeHtml(summary.closing)}</p>` +
+    materialsHtml(summary.materials) +
+    para(escapeHtml(summary.closing)) +
     `</div>`
   );
 }
@@ -250,7 +264,7 @@ export function selectionSummaryHtml(summary: SelectionSummary): string {
 export function selectionSummaryText(summary: SelectionSummary): string {
   const width = Math.max(...summary.towers.flatMap((tower) => tower.rows.map(([label]) => label.length)), 0) + 2;
   const materialsText = (lines: string[]) =>
-    lines.length ? ["Materials of Construction", ...lines.map((line) => `• ${line}`)].join("\n") : "";
+    lines.length ? ["Materials of Construction", "", ...lines.map((line) => `• ${line}`)].join("\n") : "";
   const towers = summary.towers.map((tower) =>
     [
       [tower.heading, tower.description, ...tower.rows.map(([label, value]) => `${label.padEnd(width)}${value}`)].join(
@@ -263,7 +277,7 @@ export function selectionSummaryText(summary: SelectionSummary): string {
   );
   const materials = materialsText(summary.materials);
   const attachments = summary.attachments.length
-    ? ["Please find attached for your review:", ...summary.attachments.map((name) => `• ${name}`)].join("\n")
+    ? ["Please find attached for your review:", "", ...summary.attachments.map((name) => `• ${name}`)].join("\n")
     : "";
   return [
     summary.greeting,
