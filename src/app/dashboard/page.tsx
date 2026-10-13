@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ArrowRight, Construction, FileSpreadsheet, FileText, History, Receipt } from "lucide-react";
+import { ArrowRight, Construction, FileSpreadsheet, FileText, Receipt } from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RecentDocuments } from "@/components/recent-documents";
 
 const QUICK_ACTIONS = [
   {
@@ -63,23 +63,7 @@ export default function DashboardPage() {
         ))}
       </section>
 
-      <Card className="mt-6">
-        <CardHeader className="flex items-center justify-between">
-          <CardTitle>Recent Documents</CardTitle>
-          <Link href="/history" className="text-primary text-sm font-medium hover:underline">
-            View history
-          </Link>
-        </CardHeader>
-        <CardContent className="grid justify-items-center gap-2 py-6 text-center">
-          <div className="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-full">
-            <History className="size-5" />
-          </div>
-          <p className="font-medium">No recent documents</p>
-          <p className="text-muted-foreground max-w-sm text-sm">
-            Documents you generate will appear here once document history is available.
-          </p>
-        </CardContent>
-      </Card>
+      <RecentDocuments />
     </main>
   );
 }

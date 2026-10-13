@@ -1,5 +1,5 @@
 import type { ProjectVersion } from "@/lib/history";
-import { deleteProject, isSafeKey, listVersions, readNotes } from "@/lib/history-server";
+import { deleteProject, isSafeKey, listVersions, noteOf, readNotes } from "@/lib/history-server";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,10 @@ export async function GET(_request: Request, { params }: Params) {
 
   const [files, notes] = await Promise.all([listVersions(key), readNotes(key)]);
   const versions: ProjectVersion[] = files
-    .map((file) => ({ id: file.id, title: file.title, savedAt: file.savedAt, changes: notes[file.id] ?? [] }))
+    .map((file) => {
+      const note = noteOf(notes, file.id);
+      return { id: file.id, title: file.title, savedAt: file.savedAt, changes: note.changes, savedBy: note.by ?? "" };
+    })
     .reverse();
   return Response.json({ versions });
 }

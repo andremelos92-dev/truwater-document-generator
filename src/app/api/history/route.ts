@@ -1,5 +1,6 @@
 import { describeChanges } from "@/lib/history-changes";
 import { historyTitle, projectKey, restoreProposal, type ProjectSummary, type ProjectVersion } from "@/lib/history";
+import { USERS, currentUser } from "@/lib/auth";
 import { encodeTitle, listVersions, readNotes, readVersion, writeNotes, writeVersion } from "@/lib/history-server";
 import type { ProposalData } from "@/lib/proposal";
 
@@ -40,9 +41,12 @@ export async function POST(request: Request) {
 
   const title = historyTitle(data);
   const id = `${Date.now()}_${encodeTitle(title)}`;
+  const user = await currentUser();
+  const savedBy = user ? USERS[user].name : "";
   await writeVersion(key, id, body.data);
-  await writeNotes(key, { ...(await readNotes(key)), [id]: changes });
+  await writeNotes(key, { ...(await readNotes(key)), [id]: { changes, by: savedBy } });
 
-  const version: ProjectVersion = { id, title, savedAt: new Date(Number(id.split("_")[0])).toISOString(), changes };
+  const savedAt = new Date(Number(id.split("_")[0])).toISOString();
+  const version: ProjectVersion = { id, title, savedAt, changes, savedBy };
   return Response.json({ key, version });
 }

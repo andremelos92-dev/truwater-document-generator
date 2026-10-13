@@ -14,7 +14,12 @@ export type ProjectVersion = {
   title: string;
   savedAt: string; // ISO date
   changes: string[];
+  /** Who saved it, e.g. "Andre Santos" (blank for early saves). */
+  savedBy: string;
 };
+
+/** A save in the recent activity across all projects. */
+export type RecentSave = ProjectVersion & { key: string; latest: boolean };
 
 /** Where a project opens in the browser: its latest save, or one version. */
 export function projectUrl(key: string, version?: string): string {

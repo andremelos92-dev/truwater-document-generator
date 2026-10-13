@@ -6,14 +6,22 @@ import { del, get, list, put } from "@vercel/blob";
 /**
  * Saved projects live under this folder of the blob store, one folder per TTA quote number:
  *   projects/<KEY>/<timestamp>_<base64url title>.json.gz   one compressed file per save (the whole form)
- *   projects/<KEY>/notes.json                              what changed in each save, by version id
+ *   projects/<KEY>/notes.json                              what changed in each save and who saved it, by version id
  */
 export const PROJECTS_PREFIX = "projects/";
 
 export type VersionFile = { key: string; id: string; title: string; savedAt: string; pathname: string };
 
-/** Change notes of a project's saves, by version id. */
-export type Notes = Record<string, string[]>;
+/** What a save changed, and who saved it (saves from before names were kept have none). */
+export type Note = { changes: string[]; by?: string };
+
+/** Notes on a project's saves, by version id (early saves hold just the list of changes). */
+export type Notes = Record<string, string[] | Note>;
+
+export function noteOf(notes: Notes, id: string): Note {
+  const note = notes[id];
+  return Array.isArray(note) ? { changes: note } : (note ?? { changes: [] });
+}
 
 export const isSafeKey = (key: string) => /^[A-Z0-9]+$/.test(key);
 export const isSafeVersion = (id: string) => /^\d+_[A-Za-z0-9_-]*$/.test(id);

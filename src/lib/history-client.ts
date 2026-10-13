@@ -1,6 +1,6 @@
 "use client";
 
-import type { ProjectSummary, ProjectVersion } from "@/lib/history";
+import type { ProjectSummary, ProjectVersion, RecentSave } from "@/lib/history";
 import type { ProposalData } from "@/lib/proposal";
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -16,6 +16,8 @@ export type SaveResult = { key: string; version?: ProjectVersion; unchanged?: bo
 
 export const historyApi = {
   projects: () => call<{ projects: ProjectSummary[] }>("/api/history").then((r) => r.projects),
+  /** The latest saves across every project, newest first. */
+  recent: () => call<{ saves: RecentSave[] }>("/api/history/recent").then((r) => r.saves),
   versions: (key: string) => call<{ versions: ProjectVersion[] }>(`/api/history/${key}`).then((r) => r.versions),
   save: (data: ProposalData) =>
     call<SaveResult>("/api/history", { method: "POST", body: JSON.stringify({ data }) }),

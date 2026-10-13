@@ -10,13 +10,13 @@ import { Input } from "@/components/ui/input";
 import { projectUrl, type ProjectSummary, type ProjectVersion } from "@/lib/history";
 import { historyApi } from "@/lib/history-client";
 
-const dateFormat = new Intl.DateTimeFormat("en-AU", { dateStyle: "medium", timeStyle: "short" });
+export const dateFormat = new Intl.DateTimeFormat("en-AU", { dateStyle: "medium", timeStyle: "short" });
 
 /** Change notes shown before "Show all". */
 const NOTES_SHOWN = 4;
 
 /** "Open" in this tab, plus an icon to open the same link in a new browser tab. */
-function OpenButtons({ href, label, primary }: { href: string; label: string; primary?: boolean }) {
+export function OpenButtons({ href, label, primary }: { href: string; label: string; primary?: boolean }) {
   return (
     <div className="flex">
       <Button asChild size="sm" variant={primary ? "default" : "outline"} className="rounded-r-none">
@@ -38,9 +38,10 @@ function OpenButtons({ href, label, primary }: { href: string; label: string; pr
   );
 }
 
-function Changes({ changes }: { changes: string[] }) {
+/** A save's change notes, the first few with "Show all". */
+export function Changes({ changes, limit = NOTES_SHOWN }: { changes: string[]; limit?: number }) {
   const [all, setAll] = useState(false);
-  const shown = all ? changes : changes.slice(0, NOTES_SHOWN);
+  const shown = all ? changes : changes.slice(0, limit);
   return (
     <ul className="text-muted-foreground mt-1 grid gap-0.5 text-xs">
       {shown.map((line, i) => (
@@ -48,7 +49,7 @@ function Changes({ changes }: { changes: string[] }) {
           • {line}
         </li>
       ))}
-      {changes.length > NOTES_SHOWN && (
+      {changes.length > limit && (
         <li>
           <button type="button" className="text-primary font-medium hover:underline" onClick={() => setAll(!all)}>
             {all ? "Show less" : `Show all ${changes.length} changes`}
@@ -222,6 +223,9 @@ export function HistoryBrowser() {
                                   <div className="min-w-0 flex-1">
                                     <p className="text-sm font-medium">
                                       {dateFormat.format(new Date(version.savedAt))}
+                                      {version.savedBy && (
+                                        <span className="text-muted-foreground font-normal"> by {version.savedBy}</span>
+                                      )}
                                       {index === 0 && (
                                         <span className="text-primary ml-2 text-xs font-semibold">LATEST</span>
                                       )}
