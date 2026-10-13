@@ -6,25 +6,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import { createRevision, MAX_REVISIONS, REVISION_PEOPLE, type Revision } from "@/lib/proposal";
+import { createRevision, MAX_REVISIONS, REVISION_PEOPLE, REVISION_STATUSES, type Revision } from "@/lib/proposal";
 import { cn } from "@/lib/utils";
 
-type PersonColumn = keyof typeof REVISION_PEOPLE;
+/** Columns chosen from a list: the status and the sign-offs. */
+const COLUMN_OPTIONS = { status: REVISION_STATUSES, ...REVISION_PEOPLE };
 
-function isPersonColumn(key: keyof Revision): key is PersonColumn {
-  return key in REVISION_PEOPLE;
+type ListColumn = keyof typeof COLUMN_OPTIONS;
+
+function isListColumn(key: keyof Revision): key is ListColumn {
+  return key in COLUMN_OPTIONS;
 }
 
-/** The names offered for a sign-off column, keeping any other name already entered. */
-function personOptions(column: PersonColumn, current: string): readonly string[] {
-  const names: readonly string[] = REVISION_PEOPLE[column];
-  return current && !names.includes(current) ? [...names, current] : names;
+/** The choices offered for a column, keeping any other value already entered. */
+function columnOptions(column: ListColumn, current: string): readonly string[] {
+  const choices: readonly string[] = COLUMN_OPTIONS[column];
+  return current && !choices.includes(current) ? [...choices, current] : choices;
 }
 
 const REVISION_FIELDS: { key: keyof Revision; label: string; type?: string; width?: string }[] = [
   { key: "rev", label: "Rev.", width: "w-12" },
   { key: "date", label: "Date", type: "date", width: "w-36" },
-  { key: "status", label: "Status", width: "w-24" },
+  { key: "status", label: "Status", width: "w-32" },
   { key: "preparedBy", label: "Prepared By", width: "w-32" },
   { key: "checkedBy", label: "Checked By", width: "w-32" },
   { key: "approvedBy", label: "Approved By", width: "w-32" },
@@ -43,7 +46,7 @@ export function RevisionsEditor({
     onChange(revisions.map((revision, i) => (i === index ? { ...revision, [key]: value } : revision)));
 
   const renderField = (revision: Revision, index: number, column: (typeof REVISION_FIELDS)[number], id?: string) =>
-    isPersonColumn(column.key) ? (
+    isListColumn(column.key) ? (
       <NativeSelect
         id={id}
         aria-label={`${column.label} (row ${index + 1})`}
@@ -52,7 +55,7 @@ export function RevisionsEditor({
         onChange={(event) => setValue(index, column.key, event.target.value)}
       >
         <option value="">–</option>
-        {personOptions(column.key, revision[column.key]).map((name) => (
+        {columnOptions(column.key, revision[column.key]).map((name) => (
           <option key={name} value={name}>
             {name}
           </option>

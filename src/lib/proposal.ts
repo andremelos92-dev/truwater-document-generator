@@ -455,6 +455,9 @@ export const REVISION_PEOPLE = {
   approvedBy: ["Kenx Wong", "WK How"],
 } as const satisfies Partial<Record<keyof Revision, readonly string[]>>;
 
+/** Statuses offered in the revision table. Add one here to offer it. */
+export const REVISION_STATUSES = ["Initial Bid", "Revised Offer", "Accepted Offer", "Final Offer"] as const;
+
 export function createRevision(rev: string): Revision {
   return {
     rev,
