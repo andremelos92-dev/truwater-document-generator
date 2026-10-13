@@ -274,7 +274,7 @@ export function CommercialProposal({
               <div className="bg-muted/40 grid grid-cols-2 gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,1.5fr)_5rem_minmax(0,1.5fr)_minmax(0,1.2fr)]">
                 <div className="col-span-2 grid content-start gap-1.5 sm:col-span-1">
                   <Label htmlFor={`commercial-tower-${index}-price`}>
-                    1.1 Material price (AUD){marked(towerBox(index, "price")) && <ScanStar />}
+                    1.1 Sales Price (AUD){marked(towerBox(index, "price")) && <ScanStar />}
                   </Label>
                   <Input
                     id={`commercial-tower-${index}-price`}
