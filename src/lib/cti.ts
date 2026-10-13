@@ -43,11 +43,20 @@ export function parseCtiTable(pages: TextItem[][]): CtiTable {
   const models = new Map<string, CtiModel>();
 
   for (const page of pages) {
-    const pageRows = rows(page);
-    const header = pageRows.find((r) => /condition reference/i.test(r.items[0]?.text ?? ""));
+    // Some certifications print the table sideways (turned 90° on a portrait page): try it both ways round.
+    // Turned text runs along the page's height, so its width isn't across the columns any more.
+    const turned = (sign: 1 | -1) => page.map((i) => ({ ...i, x: -sign * i.y, y: sign * i.x, width: 0 }));
+    let pageRows: Row[] = [];
+    let header: Row | undefined;
+    // The header row: "Condition Reference #" followed by the condition numbers.
+    const numbers = (row: Row) => row.items.filter((i) => NUMBER.test(i.text.trim()));
+    for (const items of [page, turned(1), turned(-1)]) {
+      pageRows = rows(items);
+      header = pageRows.find((r) => /condition reference/i.test(r.items[0]?.text ?? "") && numbers(r).length >= 5);
+      if (header) break;
+    }
     if (!header) continue;
-    const columns = header.items.filter((i) => NUMBER.test(i.text.trim())).map(center);
-    if (columns.length < 5) continue;
+    const columns = numbers(header).map(center);
     const spacing = (columns[columns.length - 1] - columns[0]) / (columns.length - 1);
     const columnOf = (item: TextItem) => {
       const x = center(item);
@@ -79,7 +88,8 @@ export function parseCtiTable(pages: TextItem[][]): CtiTable {
     for (const row of pageRows) {
       if (row === header) continue;
       const label = row.items.filter((i) => i.x + i.width < firstColumn).map((i) => i.text.trim()).join(" ");
-      if (!label || /^(wet bulb|range|approach|inlet|outlet|condition)/i.test(label)) continue;
+      // Section breaks print as a row of zeros under a "0" label.
+      if (!label || /^[\d\s.]*$/.test(label) || /^(wet bulb|range|approach|inlet|outlet|condition)/i.test(label)) continue;
       const cells = row.items.filter((i) => i.x + i.width >= firstColumn);
       if (cells.length < columns.length / 2) continue;
       const flows: (number | null)[] = columns.map(() => null);

@@ -23,10 +23,15 @@ export type ModelDetails = {
   /** Per fan motor. */
   motorHp?: number;
   motorKw?: number;
-  /** Nominal plan size: the name's feet, rounded up to whole feet by the maker. */
+  /** Plan size (for EVAPCO nominal: the name's feet, rounded up to whole feet by the maker). */
   widthMm: number;
   lengthMm: number;
+  /** The CTI table rates one cell (Truwater EC-S): towers of 2–4 cells side by side are offered too. */
+  perCell?: boolean;
 };
+
+/** Most cells offered for a per-cell model. */
+const MAX_CELLS = 4;
 
 /** IEC motor size (kW) for each standard horsepower. */
 const KW_FOR_HP: Record<number, number> = {
@@ -40,11 +45,34 @@ const EVAPCO_HP: Record<string, number> = {
 
 const FOOT = 304.8;
 
+/** Truwater EC-S motor size letter (kW per fan), from the EC-S Series Range data sheets. */
+const TRUWATER_KW: Record<string, number> = {
+  X: 1.5, Y: 2.2, Z: 3, A: 4, B: 5.5, C: 7.5, D: 11, E: 15, F: 18.5, G: 22, H: 30, I: 37, J: 45, K: 55, L: 75,
+};
+
+/** Truwater EC-S nominal box size -> overall L × W (mm) per cell, from the EC-S Series Range data sheets. */
+const TRUWATER_BOX: Record<string, [number, number]> = {
+  "0606": [1890, 1890], "0707": [2195, 2195], "0808": [2500, 2500], "0711": [2195, 3410], "0811": [2500, 3410],
+  "0911": [2805, 3410], "1010": [3110, 3110], "1012": [3110, 3720], "1111": [3410, 3410], "1212": [3720, 3720],
+  "1313": [4020, 4020], "1414": [4330, 4330], "1515": [4630, 4630], "1616": [4940, 4940], "1717": [5240, 5240],
+  "1818": [5550, 5550], "2020": [6160, 6160], "2222": [6770, 6770], "2424": [7380, 7380],
+};
+
 /**
- * Model details from the name, for makers whose nomenclature is known. EVAPCO "AT 212-4N40F": 2 cells, unit
- * 12 ft wide, 4 layers of fill, N = 40 HP per fan, unit 40 ft long.
+ * Model details from the name, for makers whose nomenclature is known.
+ * - EVAPCO "AT 212-4N40F": 2 cells, unit 12 ft wide, 4 layers of fill, N = 40 HP per fan, unit 40 ft long.
+ * - Truwater EC-S "1212G" / "ECS 1212G4-2B" / "0606X_-1U": box 1212, G = 22 kW, cells after the dash (CTI rows are
+ *   per cell).
  */
 export function modelDetails(name: string): ModelDetails | null {
+  const truwater = /^(?:i?EC[SFTX]\s*)?(\d{4})([A-Z])[\d_]?(?:-(\d+)[A-Z]*)?$/.exec(name.trim());
+  if (truwater && TRUWATER_BOX[truwater[1]]) {
+    const [, box, letter, cells] = truwater;
+    const [cellLength, widthMm] = TRUWATER_BOX[box];
+    const count = Number(cells ?? 1);
+    // Cells stand side by side along the length.
+    return { cells: count, motorKw: TRUWATER_KW[letter], widthMm, lengthMm: cellLength * count, perCell: !cells };
+  }
   const evapco = /^(?:AT|UT|USS)\s+(\d)(\d+)-(\d)([A-Z])(\d+)/.exec(name.trim());
   if (evapco) {
     const [, cells, width, , letter, length] = evapco;
@@ -100,23 +128,32 @@ export function dutyProblem(duty: Partial<Duty>): string | null {
   return null;
 }
 
-/** Every model that cools the duty's flow, smallest margin first. */
+/**
+ * Every model that cools the duty's flow, smallest margin first. Models rated per cell are also offered as
+ * towers of 2–4 cells ("1212G-2"), each cell taking an equal share of the flow.
+ */
 export function selectTowers(tables: MakerTable[], duty: Duty): Candidate[] {
   const condition = { wetBulb: duty.wetBulb, range: duty.hot - duty.cold, approach: duty.cold - duty.wetBulb };
   const candidates: Candidate[] = [];
   for (const table of tables) {
     for (const model of table.models) {
       const estimate = estimateFlow(table.conditions, model, condition);
-      if (!estimate || estimate.flow < duty.flow) continue;
-      candidates.push({
-        tableId: table.id,
-        maker: table.maker,
-        series: table.series,
-        model: model.name,
-        estimate,
-        margin: (estimate.flow / duty.flow - 1) * 100,
-        details: modelDetails(model.name),
-      });
+      if (!estimate) continue;
+      const details = modelDetails(model.name);
+      const cellCounts = details?.perCell ? Array.from({ length: MAX_CELLS }, (_, i) => i + 1) : [1];
+      for (const cells of cellCounts) {
+        const flow = estimate.flow * cells;
+        if (flow < duty.flow) continue;
+        candidates.push({
+          tableId: table.id,
+          maker: table.maker,
+          series: table.series,
+          model: cells > 1 ? `${model.name.replace(/[_-]+$/, "")}-${cells}` : model.name,
+          estimate: { ...estimate, flow, nearest: { ...estimate.nearest, flow: estimate.nearest.flow * cells } },
+          margin: (flow / duty.flow - 1) * 100,
+          details: details && cells > 1 ? { ...details, cells, lengthMm: details.lengthMm * cells } : details,
+        });
+      }
     }
   }
   return candidates.sort((a, b) => a.margin - b.margin);

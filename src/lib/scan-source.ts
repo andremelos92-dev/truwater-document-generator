@@ -36,7 +36,12 @@ async function ocr(
 }
 
 /** Reads every page of a PDF (or an image) as positioned text, using OCR where there's no text layer. */
-export async function readDocument(file: File, onProgress: (progress: ScanProgress) => void): Promise<TextItem[][]> {
+export async function readDocument(
+  file: File,
+  onProgress: (progress: ScanProgress) => void,
+  /** Pages to read; CTI certifications keep their performance table on the last page, so they read them all. */
+  { maxPages = MAX_PAGES }: { maxPages?: number } = {}
+): Promise<TextItem[][]> {
   let worker: OcrWorker | null = null;
   const getWorker = async () => {
     onProgress({ step: "Loading text recognition…" });
@@ -59,7 +64,7 @@ export async function readDocument(file: File, onProgress: (progress: ScanProgre
 
     const pages: TextItem[][] = [];
     let ocrPages = 0;
-    for (let number = 1; number <= Math.min(pdf.numPages, MAX_PAGES); number++) {
+    for (let number = 1; number <= Math.min(pdf.numPages, maxPages); number++) {
       const page = await pdf.getPage(number);
       const items = (await page.getTextContent()).items.flatMap((item) =>
         "str" in item && item.str.trim()

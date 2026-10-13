@@ -59,7 +59,12 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 /** A maker's name guessed from a file name: "CTI_49_SI_10April2026 - Evapco.pdf" -> "Evapco". */
+/** Cooling tower makers recognised in a file name. */
+const KNOWN_MAKERS = ["Truwater", "Evapco", "BAC", "Marley", "SPX", "Shinwa", "Liang Chi", "Kuken", "Aqua Cool", "Lakeside"];
+
 function makerFromFile(name: string): string {
+  const known = KNOWN_MAKERS.find((maker) => name.toLowerCase().replace(/[_-]/g, " ").includes(maker.toLowerCase()));
+  if (known) return known;
   const base = name.replace(/\.[a-z]+$/i, "");
   const afterDash = base.split(/\s+-\s+/).pop() ?? base;
   return afterDash.replace(/^CTI[_\s\d]*SI[_\s\d\w]*$/i, "").trim();
@@ -199,7 +204,7 @@ export function TowerSelector() {
     setBusy("table");
     setMessage(null);
     try {
-      const table = parseCtiTable(await readDocument(file, () => {}));
+      const table = parseCtiTable(await readDocument(file, () => {}, { maxPages: 500 }));
       setPending({ fileName: file.name, table, maker: makerFromFile(file.name), series: "" });
     } catch (err) {
       console.error(err);
@@ -430,7 +435,9 @@ export function TowerSelector() {
                           )}
                         </td>
                         <td className="px-2 py-2">
-                          {c.details?.motorKw ? `${c.details.motorKw} kW (${c.details.motorHp} HP)` : "–"}
+                          {c.details?.motorKw
+                            ? `${c.details.motorKw} kW${c.details.motorHp ? ` (${c.details.motorHp} HP)` : ""}`
+                            : "–"}
                         </td>
                         <td className="px-2 py-2 text-right">{c.details?.cells ?? "–"}</td>
                         <td className="px-2 py-2 tabular-nums">
