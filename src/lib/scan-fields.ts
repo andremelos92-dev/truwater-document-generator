@@ -154,7 +154,9 @@ const isProjectId = (id: ScanFieldId): id is (typeof PROJECT_IDS)[number] =>
 /** True when the field still holds the form's starting value (blank, or a default like the SS316 scope materials). */
 export function isUntouched(data: ProposalData, id: ScanFieldId, index: number): boolean {
   const now = currentScanValue(data, id, index).trim();
-  return !now || now === currentScanValue(INITIAL, id, 0).trim();
+  if (!now || now === currentScanValue(INITIAL, id, 0).trim()) return true;
+  // A new tower type's Scope of Supply starts as a copy of tower type 1's, so those values weren't typed for it.
+  return index > 0 && !!SCOPE_ITEMS[id] && now === currentScanValue(data, id, 0).trim();
 }
 
 /** Whether the scan has somewhere to put this field in tower type `index` (scope items can be renamed or removed). */
