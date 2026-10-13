@@ -13,7 +13,9 @@ import { parseScan, toLines } from "@/lib/scan-parse";
 import { readDocument } from "@/lib/scan-source";
 import {
   dutyProblem,
+  matchNotes,
   planArea,
+  rankTowers,
   recommend,
   selectTowers,
   totalKw,
@@ -40,8 +42,8 @@ const DUTY_FIELDS: { id: DutyField; label: string; unit: string; placeholder: st
 
 const FILTER_FIELDS: { id: DutyField; label: string; unit: string; placeholder: string }[] = [
   { id: "cells", label: "No. of cells", unit: "#", placeholder: "Any" },
-  { id: "maxLengthMm", label: "Space: length", unit: "mm", placeholder: "Any" },
-  { id: "maxWidthMm", label: "Space: width", unit: "mm", placeholder: "Any" },
+  { id: "maxLengthMm", label: "Space: length (approx.)", unit: "mm", placeholder: "Any" },
+  { id: "maxWidthMm", label: "Space: width (approx.)", unit: "mm", placeholder: "Any" },
 ];
 
 /** The first number in a typed or scanned value ("106.76 L/s" -> 106.76). */
@@ -138,13 +140,17 @@ export function TowerSelector() {
     [tables, pending]
   );
 
+  const margin = numberIn(minMargin) ?? 0;
   const results = useMemo(
-    () => (problem || loadedTables.length === 0 ? [] : selectTowers(loadedTables, duty as Duty)),
+    () =>
+      problem || loadedTables.length === 0
+        ? []
+        : rankTowers(selectTowers(loadedTables, duty as Duty), duty as Duty, margin),
     // The duty is rebuilt from `values` each render; recompute when they change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [problem, loadedTables, values, motorMatch]
+    [problem, loadedTables, values, motorMatch, margin]
   );
-  const recommendation = useMemo(() => recommend(results, numberIn(minMargin) ?? 0), [results, minMargin]);
+  const recommendation = useMemo(() => recommend(results, margin), [results, margin]);
 
   const set = (id: DutyField, value: string) => {
     setValues((prev) => ({ ...prev, [id]: value }));
@@ -289,10 +295,14 @@ export function TowerSelector() {
             Approach{" "}
             <span className="text-foreground font-medium">{approach !== undefined ? `${fmt(approach, 2)} °C` : "–"}</span>
           </p>
-          <div className="grid gap-3 border-t pt-4 sm:grid-cols-4">
+          <p className="text-muted-foreground border-t pt-4 text-sm">
+            Optional and approximate: the tower closest to these is picked. Leave them blank for a compact tower with a
+            low motor power.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-4">
             <div className="grid content-start gap-1.5">
               <Label htmlFor="duty-motorKw">
-                Motor per fan <span className="text-muted-foreground text-xs font-normal">kW</span>
+                Motor per fan (approx.) <span className="text-muted-foreground text-xs font-normal">kW</span>
               </Label>
               <div className="flex">
                 <Input
@@ -312,7 +322,7 @@ export function TowerSelector() {
                     setShown(PAGE);
                   }}
                 >
-                  <option value="exact">exactly</option>
+                  <option value="exact">about</option>
                   <option value="max">or less</option>
                 </NativeSelect>
               </div>
@@ -362,8 +372,8 @@ export function TowerSelector() {
         <CardHeader>
           <CardTitle>Tower to use</CardTitle>
           <CardDescription>
-            Smallest margin first. Motor and footprint come from the model name (nominal plan size, rounded up to
-            whole feet); models whose details aren&apos;t known are kept without them.
+            The best match for the duty and the numbers typed. Motor and plan size come from the model name (nominal,
+            rounded up to whole feet).
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0">
@@ -377,12 +387,12 @@ export function TowerSelector() {
             <p className="text-muted-foreground px-6 text-sm">{problem}</p>
           ) : results.length === 0 ? (
             <p className="text-muted-foreground px-6 text-sm">
-              No model cools this duty with these filters. Try allowing a smaller motor, more cells or more space.
+              No model in the attached tables cools this duty.
             </p>
           ) : (
             <>
-            <RecommendationPanel recommendation={recommendation} minMargin={numberIn(minMargin) ?? 0} />
-            <p className="px-6 pb-2 text-sm font-semibold">Every tower that cools the duty</p>
+            <RecommendationPanel recommendation={recommendation} minMargin={margin} duty={duty as Duty} />
+            <p className="px-6 pb-2 text-sm font-semibold">Every tower that cools the duty, best match first</p>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
@@ -576,12 +586,20 @@ function Pick({ label, candidate, highlight }: { label: string; candidate: Candi
 }
 
 /** The tower to use for the duty, with the smallest and lowest power alternatives when they differ. */
-function RecommendationPanel({ recommendation, minMargin }: { recommendation: ReturnType<typeof recommend>; minMargin: number }) {
+function RecommendationPanel({
+  recommendation,
+  minMargin,
+  duty,
+}: {
+  recommendation: ReturnType<typeof recommend>;
+  minMargin: number;
+  duty: Duty;
+}) {
   if (!recommendation) {
     return (
       <p className="mx-6 mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-        No tower has {fmtNumber(minMargin)}% spare capacity with these filters. Lower the minimum spare capacity or loosen
-        the filters; the list below shows what does cool the duty.
+        No tower has {fmtNumber(minMargin)}% spare capacity. Lower the minimum spare capacity; the list below shows what
+        does cool the duty.
       </p>
     );
   }
@@ -593,7 +611,14 @@ function RecommendationPanel({ recommendation, minMargin }: { recommendation: Re
           <p className="flex items-center gap-1.5 text-sm font-semibold">
             <Award className="text-primary size-4" /> Use this tower
           </p>
-          <Pick label={`Closest fit with ≥ ${fmtNumber(minMargin)}% spare`} candidate={best} highlight />
+          <Pick label={`Best match · ≥ ${fmtNumber(minMargin)}% spare`} candidate={best} highlight />
+          {matchNotes(best, duty).length > 0 && (
+            <ul className="text-muted-foreground grid gap-0.5 text-xs">
+              {matchNotes(best, duty).map((note) => (
+                <li key={note}>• {note}</li>
+              ))}
+            </ul>
+          )}
         </div>
         {smallest && <Pick label="Alternative: smallest plan" candidate={smallest} />}
         {lowestPower && <Pick label="Alternative: lowest motor power" candidate={lowestPower} />}

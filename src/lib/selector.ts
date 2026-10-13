@@ -65,11 +65,14 @@ export type Duty = {
   hot: number; // °C in
   cold: number; // °C out
   wetBulb: number;
-  /** Motor per fan (kW); with `motorMatch` "exact" only that size, "max" that size or smaller. */
+  /**
+   * Targets, not limits (the RFQ's numbers are estimates): the pick is the tower closest to them. Motor per fan
+   * (kW): "exact" = about that size, "max" = that size or smaller preferred.
+   */
   motorKw?: number;
   motorMatch: "exact" | "max";
   cells?: number;
-  /** Space available (either way round). */
+  /** Space available, roughly (either way round); a tower bigger than this counts against it more than a smaller one. */
   maxLengthMm?: number;
   maxWidthMm?: number;
 };
@@ -97,31 +100,12 @@ export function dutyProblem(duty: Partial<Duty>): string | null {
   return null;
 }
 
-const fits = (details: ModelDetails, duty: Duty) => {
-  const { maxLengthMm: l, maxWidthMm: w } = duty;
-  if (!l && !w) return true;
-  const L = l ?? Infinity;
-  const W = w ?? Infinity;
-  return (details.lengthMm <= L && details.widthMm <= W) || (details.lengthMm <= W && details.widthMm <= L);
-};
-
-/**
- * Every model that cools the duty's flow, smallest margin first. Motor, cells and footprint filters only
- * apply to models whose details are known; the others are kept and shown without them.
- */
+/** Every model that cools the duty's flow, smallest margin first. */
 export function selectTowers(tables: MakerTable[], duty: Duty): Candidate[] {
   const condition = { wetBulb: duty.wetBulb, range: duty.hot - duty.cold, approach: duty.cold - duty.wetBulb };
   const candidates: Candidate[] = [];
   for (const table of tables) {
     for (const model of table.models) {
-      const details = modelDetails(model.name);
-      if (details) {
-        if (duty.motorKw && details.motorKw !== undefined) {
-          if (duty.motorMatch === "exact" ? details.motorKw !== duty.motorKw : details.motorKw > duty.motorKw) continue;
-        }
-        if (duty.cells && details.cells !== duty.cells) continue;
-        if (!fits(details, duty)) continue;
-      }
       const estimate = estimateFlow(table.conditions, model, condition);
       if (!estimate || estimate.flow < duty.flow) continue;
       candidates.push({
@@ -131,7 +115,7 @@ export function selectTowers(tables: MakerTable[], duty: Duty): Candidate[] {
         model: model.name,
         estimate,
         margin: (estimate.flow / duty.flow - 1) * 100,
-        details,
+        details: modelDetails(model.name),
       });
     }
   }
@@ -146,26 +130,81 @@ export const totalKw = (c: Candidate) =>
 export const planArea = (c: Candidate) =>
   c.details ? (c.details.lengthMm * c.details.widthMm) / 1e6 : undefined;
 
+const hasSpace = (duty: Duty) => !!(duty.maxLengthMm || duty.maxWidthMm);
+
+/** How far a plan is from the space typed: going over counts 3×, coming in under 1× (best way round). */
+function spaceMiss(details: ModelDetails, duty: Duty): number {
+  const miss = (size: number, target?: number) =>
+    !target ? 0 : size > target ? (3 * (size - target)) / target : (target - size) / target;
+  return Math.min(
+    miss(details.lengthMm, duty.maxLengthMm) + miss(details.widthMm, duty.maxWidthMm),
+    miss(details.widthMm, duty.maxLengthMm) + miss(details.lengthMm, duty.maxWidthMm)
+  );
+}
+
+/** How far a motor is from the one typed (relative): "max" counts a bigger motor 3×, a smaller one ½×. */
+function motorMiss(kw: number, duty: Duty): number {
+  const d = (kw - duty.motorKw!) / duty.motorKw!;
+  return duty.motorMatch === "max" ? (d > 0 ? 3 * d : -0.5 * d) : 2 * Math.abs(d);
+}
+
+/**
+ * How well a tower suits the duty, lower is better. The margin above the minimum always counts (closest fit);
+ * motor, cells and space count towards the numbers typed or, when none were typed, towards a compact tower with
+ * a low motor power.
+ */
+function score(c: Candidate, duty: Duty, minMargin: number, smallestArea: number, lowestKw: number): number {
+  let total = (c.margin - minMargin) / 10;
+  if (c.estimate.extrapolated) total += 1;
+  const d = c.details;
+  // Motor and size unknown: picked only when nothing known suits better.
+  if (!d) return total + 1.5;
+  total += hasSpace(duty) ? 2 * spaceMiss(d, duty) : 2 * ((d.lengthMm * d.widthMm) / 1e6 / smallestArea - 1);
+  if (d.motorKw === undefined) total += 0.5;
+  else if (duty.motorKw) total += 1.5 * motorMiss(d.motorKw, duty);
+  else total += 0.5 * ((d.motorKw * d.cells) / lowestKw - 1);
+  if (duty.cells) total += Math.abs(d.cells - duty.cells);
+  return total;
+}
+
+/**
+ * Towers ranked for the duty, best first: those with at least `minMargin` % spare capacity by how well they suit
+ * it, then the ones short of the minimum margin (most spare first).
+ */
+export function rankTowers(candidates: Candidate[], duty: Duty, minMargin: number): Candidate[] {
+  const eligible = candidates.filter((c) => c.margin >= minMargin);
+  const areas = eligible.map(planArea).filter((a): a is number => a !== undefined);
+  const powers = eligible.map(totalKw).filter((k): k is number => k !== undefined && k > 0);
+  const smallestArea = areas.length ? Math.min(...areas) : 1;
+  const lowestKw = powers.length ? Math.min(...powers) : 1;
+  const scored = eligible
+    .map((c) => ({ c, s: score(c, duty, minMargin, smallestArea, lowestKw) }))
+    .sort((a, b) => a.s - b.s || a.c.margin - b.c.margin)
+    .map(({ c }) => c);
+  const short = candidates.filter((c) => c.margin < minMargin).sort((a, b) => b.margin - a.margin);
+  return [...scored, ...short];
+}
+
 export type Recommendation = {
-  /** The closest fit with at least the minimum margin: the tower to use. */
+  /** The tower to use: the best suited with at least the minimum margin. */
   best: Candidate;
   /** Other picks worth a look, when they differ from the best. */
   smallest?: Candidate;
   lowestPower?: Candidate;
 };
 
-/**
- * The tower to use: of the models with at least `minMargin` % spare capacity, the one with the least
- * (closest fit). The smallest plan and the lowest motor power among them are offered as alternatives.
- */
-export function recommend(candidates: Candidate[], minMargin: number): Recommendation | null {
-  const eligible = candidates.filter((c) => c.margin >= minMargin);
+/** The tower to use (first of the ranked list), with the smallest plan and the lowest motor power as alternatives. */
+export function recommend(ranked: Candidate[], minMargin: number): Recommendation | null {
+  const eligible = ranked.filter((c) => c.margin >= minMargin);
   const best = eligible[0];
   if (!best) return null;
-  const pick = (score: (c: Candidate) => number | undefined) =>
+  const pick = (value: (c: Candidate) => number | undefined) =>
     eligible
-      .filter((c) => score(c) !== undefined)
-      .reduce<Candidate | undefined>((a, c) => (!a || score(c)! < score(a)! || (score(c) === score(a) && c.margin < a.margin) ? c : a), undefined);
+      .filter((c) => value(c) !== undefined)
+      .reduce<Candidate | undefined>(
+        (a, c) => (!a || value(c)! < value(a)! || (value(c) === value(a) && c.margin < a.margin) ? c : a),
+        undefined
+      );
   const smallest = pick(planArea);
   const lowestPower = pick(totalKw);
   return {
@@ -173,4 +212,23 @@ export function recommend(candidates: Candidate[], minMargin: number): Recommend
     smallest: smallest && smallest !== best ? smallest : undefined,
     lowestPower: lowestPower && lowestPower !== best && lowestPower !== smallest ? lowestPower : undefined,
   };
+}
+
+/** How a tower compares with the numbers typed, e.g. "Plan 5,486 × 3,658 mm (your space 3,651 × 3,607)". */
+export function matchNotes(c: Candidate, duty: Duty): string[] {
+  const d = c.details;
+  if (!d) return ["Motor and size not known for this maker."];
+  const n = (v: number) => v.toLocaleString("en-AU", { maximumFractionDigits: 1 });
+  const notes: string[] = [];
+  if (duty.motorKw && d.motorKw !== undefined) {
+    notes.push(
+      d.motorKw === duty.motorKw ? `Motor ${n(d.motorKw)} kW as typed` : `Motor ${n(d.motorKw)} kW (you typed ${n(duty.motorKw)} kW)`
+    );
+  }
+  if (duty.cells && d.cells !== duty.cells) notes.push(`${d.cells} ${d.cells === 1 ? "cell" : "cells"} (you typed ${duty.cells})`);
+  if (hasSpace(duty)) {
+    const target = [duty.maxLengthMm, duty.maxWidthMm].map((v) => (v ? n(v) : "any")).join(" × ");
+    notes.push(`Plan ${n(d.lengthMm)} × ${n(d.widthMm)} mm (your space ${target})`);
+  }
+  return notes;
 }
