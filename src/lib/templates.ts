@@ -219,7 +219,7 @@ function commercialValues(data: ProposalData): Record<string, unknown> {
   const towers = resolvedCommercialTowers(data);
   const exclusions = listItems(c.exclusions);
 
-  // One pricing schedule page per tower type; a tower also offered assembled gets a CKD page and an assembled page.
+  // One pricing schedule page per tower type; a tower also offered as Factory Pre Assembly gets a CKD page and a Factory Pre Assembly page.
   const pricingPages = towers.flatMap((tower, index) => {
     const page = formatTower(tower, towerSpec(data, index).noOfFans);
     if (!tower.assembledOption) return [{ ...page, pricingOption: "", packing: "", packingNote: "" }];
@@ -228,9 +228,9 @@ function commercialValues(data: ProposalData): Record<string, unknown> {
       { ...page, pricingOption: " – CKD (COMPLETE KNOCK DOWN)", packing: " CKD form", packingNote: " (CKD)" },
       {
         ...page,
-        pricingOption: " – ASSEMBLED",
-        packing: " assembled",
-        packingNote: " (Assembled)",
+        pricingOption: " – FACTORY PRE ASSEMBLY",
+        packing: " Factory Pre Assembly",
+        packingNote: " (Factory Pre Assembly)",
         price: audPrice(assembled.price),
         total: audPrice(towerTotal(assembled)),
       },

@@ -352,15 +352,15 @@ export function CommercialProposal({
                     checked={!!tower.assembledOption}
                     onChange={(event) => setTower(index, { assembledOption: event.target.checked })}
                   />
-                  Also offer it assembled
+                  Also offer it as Factory Pre Assembly
                   <span className="text-muted-foreground text-xs">
-                    (a second pricing schedule, same tower: one CKD, one assembled)
+                    (a second pricing schedule, same tower: one CKD, one Factory Pre Assembly)
                   </span>
                 </label>
                 {tower.assembledOption && (
                   <>
                     <div className="col-span-2 grid content-start gap-1.5 sm:col-span-1">
-                      <Label htmlFor={`commercial-tower-${index}-assembledPrice`}>1.1 Sales Price – Assembled (AUD)</Label>
+                      <Label htmlFor={`commercial-tower-${index}-assembledPrice`}>1.1 Sales Price – Factory Pre Assembly (AUD)</Label>
                       <Input
                         id={`commercial-tower-${index}-assembledPrice`}
                         type="number"
@@ -385,7 +385,7 @@ export function CommercialProposal({
                       />
                     </div>
                     <div className="grid content-start gap-1.5">
-                      <Label htmlFor={`commercial-tower-${index}-assembledTotal`}>Total – Assembled (AUD)</Label>
+                      <Label htmlFor={`commercial-tower-${index}-assembledTotal`}>Total – Factory Pre Assembly (AUD)</Label>
                       <Input
                         id={`commercial-tower-${index}-assembledTotal`}
                         readOnly
