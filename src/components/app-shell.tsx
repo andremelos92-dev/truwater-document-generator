@@ -50,6 +50,11 @@ function Logo() {
   );
 }
 
+/** Who designed and built the app. */
+function Credit({ className }: { className?: string }) {
+  return <p className={cn("text-center text-[10px]", className)}>{new Date().getFullYear()} © andremelos92-dev</p>;
+}
+
 function NavLinks({ onNavigate, master }: { onNavigate?: () => void; master: boolean }) {
   const pathname = usePathname();
 
@@ -144,6 +149,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <div className="border-t border-white/10 p-3">
           <LogOutButton />
+          <Credit className="mt-3 text-white/40" />
         </div>
       </aside>
 
@@ -177,7 +183,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0">
+        {children}
+        <Credit className="text-muted-foreground pb-6 md:hidden" />
+      </div>
     </div>
   );
 }
