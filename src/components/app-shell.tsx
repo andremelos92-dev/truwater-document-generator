@@ -141,8 +141,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen flex-col bg-[#1f2226] md:flex">
-        <div className="flex h-20 items-center justify-center border-b border-white/10">
+        <div className="flex h-24 flex-col items-center justify-center gap-2 border-b border-white/10 px-3">
           <Logo />
+          <p className="text-center text-[11px] leading-tight text-white/70">Truwater Technologies Australia Pty Ltd</p>
         </div>
         <div className="flex-1 overflow-y-auto py-4">
           <NavLinks master={master} />
