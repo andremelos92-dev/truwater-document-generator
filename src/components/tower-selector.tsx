@@ -57,6 +57,18 @@ const numberIn = (value: string) => {
   return match ? Number(match[0].replace(/,/g, "")) : undefined;
 };
 
+const HIDDEN_KEY = "selector.hiddenMakers";
+const LEAD_KEY = "selector.leadMaker";
+
+/** Keeps a view choice in this browser; nothing breaks without storage. */
+function remember(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Private window or storage blocked.
+  }
+}
+
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, { ...init, headers: { "content-type": "application/json", ...init.headers } });
   if (!response.ok) throw new Error((await response.json().catch(() => null))?.error ?? "Something went wrong.");
@@ -94,6 +106,19 @@ export function TowerSelector() {
   const [shown, setShown] = useState(PAGE);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "error" | "info"; text: string } | null>(null);
+  /** Makers left out of the selection (remembered in this browser). */
+  const [hiddenMakers, setHiddenMakers] = useState<string[]>([]);
+  const [lead, setLead] = useState("Truwater");
+  useEffect(() => {
+    try {
+      const hidden = JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? "[]");
+      if (Array.isArray(hidden)) setHiddenMakers(hidden.filter((m): m is string => typeof m === "string"));
+      const saved = localStorage.getItem(LEAD_KEY);
+      if (saved !== null) setLead(saved);
+    } catch {
+      // No storage: show every maker, Truwater first.
+    }
+  }, []);
   /** Only tables of this type are selected from. */
   const [towerType, setTowerType] = useState<TowerType>("counterflow");
   const [pending, setPending] = useState<{
@@ -164,17 +189,40 @@ export function TowerSelector() {
     return counts;
   }, [infos]);
 
+  const visibleMakers = makers.filter((maker) => !hiddenMakers.includes(maker));
+  /** The maker whose tower is recommended first ("" = any maker); the others are compared side by side. */
+  const leadMaker = visibleMakers.includes(lead) ? lead : "";
+  const comparedMakers = leadMaker ? [leadMaker, ...visibleMakers.filter((m) => m !== leadMaker)] : visibleMakers;
+  const visibleTables = useMemo(
+    () => loadedTables.filter((table) => !hiddenMakers.includes(table.maker)),
+    [loadedTables, hiddenMakers]
+  );
+
   const margin = numberIn(minMargin) ?? 0;
   const results = useMemo(
     () =>
-      problem || loadedTables.length === 0
+      problem || visibleTables.length === 0
         ? []
-        : rankTowers(selectTowers(loadedTables, duty as Duty), duty as Duty, margin),
+        : rankTowers(selectTowers(visibleTables, duty as Duty), duty as Duty, margin),
     // The duty is rebuilt from `values` each render; recompute when they change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [problem, loadedTables, values, motorMatch, margin]
+    [problem, visibleTables, values, motorMatch, margin]
   );
-  const recommendation = useMemo(() => recommend(results, margin), [results, margin]);
+  const recommendation = useMemo(
+    () => recommend(leadMaker ? results.filter((c) => c.maker === leadMaker) : results, margin),
+    [results, leadMaker, margin]
+  );
+
+  const toggleMaker = (maker: string) => {
+    const next = hiddenMakers.includes(maker) ? hiddenMakers.filter((m) => m !== maker) : [...hiddenMakers, maker];
+    setHiddenMakers(next);
+    setShown(PAGE);
+    remember(HIDDEN_KEY, JSON.stringify(next));
+  };
+  const chooseLead = (maker: string) => {
+    setLead(maker);
+    remember(LEAD_KEY, maker);
+  };
 
   const set = (id: DutyField, value: string) => {
     setValues((prev) => ({ ...prev, [id]: value }));
@@ -443,6 +491,42 @@ export function TowerSelector() {
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0">
+          {infos !== null && makers.length > 1 && (
+            <div className="mx-6 mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border px-3 py-2">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="text-sm font-semibold">Makers</span>
+                {makers.map((maker) => (
+                  <label key={maker} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                    <input
+                      type="checkbox"
+                      className="accent-primary size-4"
+                      checked={!hiddenMakers.includes(maker)}
+                      onChange={() => toggleMaker(maker)}
+                    />
+                    {maker}
+                  </label>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="lead-maker" className="text-sm font-semibold">
+                  Lead with
+                </Label>
+                <NativeSelect
+                  id="lead-maker"
+                  className="w-auto"
+                  value={leadMaker}
+                  onChange={(event) => chooseLead(event.target.value)}
+                >
+                  <option value="">Any maker</option>
+                  {visibleMakers.map((maker) => (
+                    <option key={maker} value={maker}>
+                      {maker}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </div>
+            </div>
+          )}
           {infos === null ? (
             <p className="text-muted-foreground flex items-center gap-2 px-6 text-sm">
               <Loader2 className="size-4 animate-spin" /> Loading maker tables…
@@ -452,6 +536,8 @@ export function TowerSelector() {
               No {towerTypeLabel(towerType).toLowerCase()} tables yet. Attach a maker&apos;s CTI doc (“Attach CTI doc”
               above) or add one under Maker tables to get the tower.
             </p>
+          ) : visibleTables.length === 0 ? (
+            <p className="text-muted-foreground px-6 text-sm">Every maker is hidden. Tick one above to get the tower.</p>
           ) : problem ? (
             <p className="text-muted-foreground px-6 text-sm">{problem}</p>
           ) : results.length === 0 ? (
@@ -460,8 +546,13 @@ export function TowerSelector() {
             </p>
           ) : (
             <>
-            <RecommendationPanel recommendation={recommendation} minMargin={margin} duty={duty as Duty} />
-            <MakerComparison picks={bestPerMaker(results, makers, margin)} minMargin={margin} />
+            <RecommendationPanel
+              recommendation={recommendation}
+              minMargin={margin}
+              duty={duty as Duty}
+              maker={leadMaker}
+            />
+            <MakerComparison picks={bestPerMaker(results, comparedMakers, margin)} minMargin={margin} />
             <p className="px-6 pb-2 text-sm font-semibold">Every tower that cools the duty, best match first</p>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
@@ -713,21 +804,27 @@ function MakerComparison({ picks, minMargin }: { picks: ReturnType<typeof bestPe
   );
 }
 
-/** The tower to use for the duty, with the smallest and lowest power alternatives when they differ. */
+/**
+ * The tower to use for the duty (from the lead maker, when one is chosen), with the smallest and lowest power
+ * alternatives when they differ.
+ */
 function RecommendationPanel({
   recommendation,
   minMargin,
   duty,
+  maker,
 }: {
   recommendation: ReturnType<typeof recommend>;
   minMargin: number;
   duty: Duty;
+  /** The lead maker, or "" for any maker. */
+  maker: string;
 }) {
   if (!recommendation) {
     return (
       <p className="mx-6 mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-        No tower has {fmtNumber(minMargin)}% spare capacity. Lower the minimum spare capacity; the list below shows what
-        does cool the duty.
+        No {maker ? `${maker} ` : ""}tower has {fmtNumber(minMargin)}% spare capacity. Lower the minimum spare
+        capacity{maker ? " or lead with another maker" : ""}; the list below shows what does cool the duty.
       </p>
     );
   }
@@ -737,7 +834,7 @@ function RecommendationPanel({
       <div className="grid gap-3 md:grid-cols-[1.3fr_1fr_1fr]">
         <div className="grid gap-2">
           <p className="flex items-center gap-1.5 text-sm font-semibold">
-            <Award className="text-primary size-4" /> Use this tower
+            <Award className="text-primary size-4" /> Use this {maker ? `${maker} ` : ""}tower
           </p>
           <Pick label={`Best match · ≥ ${fmtNumber(minMargin)}% spare`} candidate={best} highlight />
           {matchNotes(best, duty).length > 0 && (
