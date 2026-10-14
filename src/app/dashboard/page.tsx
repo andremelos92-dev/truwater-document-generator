@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Construction, FileSpreadsheet, FileText, Receipt } from "lucide-react";
+import { ArrowRight, ClipboardList, Construction, FileSpreadsheet, FileText, Receipt } from "lucide-react";
 
 import { RecentDocuments } from "@/components/recent-documents";
 
@@ -22,6 +22,12 @@ const QUICK_ACTIONS = [
     icon: Receipt,
     href: "/documents?tab=commercial",
   },
+  {
+    title: "Inquiry Form",
+    description: "The inquiry spreadsheet, filled from the RFQ.",
+    icon: ClipboardList,
+    href: "/documents?tab=inquiry",
+  },
 ];
 
 export default function DashboardPage() {
@@ -41,7 +47,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {QUICK_ACTIONS.map(({ title, description, icon: Icon, href }) => (
           <Link
             key={title}
