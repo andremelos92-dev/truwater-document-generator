@@ -219,8 +219,23 @@ function commercialValues(data: ProposalData): Record<string, unknown> {
   const towers = resolvedCommercialTowers(data);
   const exclusions = listItems(c.exclusions);
 
-  // One pricing schedule page per tower type.
-  const pricingPages = towers.map((tower, index) => formatTower(tower, towerSpec(data, index).noOfFans));
+  // One pricing schedule page per tower type; a tower also offered assembled gets a CKD page and an assembled page.
+  const pricingPages = towers.flatMap((tower, index) => {
+    const page = formatTower(tower, towerSpec(data, index).noOfFans);
+    if (!tower.assembledOption) return [{ ...page, pricingOption: "", packing: "", packingNote: "" }];
+    const assembled = { ...tower, price: tower.assembledPrice ?? "" };
+    return [
+      { ...page, pricingOption: " – CKD (COMPLETE KNOCK DOWN)", packing: " CKD form", packingNote: " (CKD)" },
+      {
+        ...page,
+        pricingOption: " – ASSEMBLED",
+        packing: " assembled",
+        packingNote: " (Assembled)",
+        price: audPrice(assembled.price),
+        total: audPrice(towerTotal(assembled)),
+      },
+    ];
+  });
   const scheduleValues = Object.fromEntries(
     c.schedule.flatMap((step, index) => [
       [`s${index + 1}_description`, step.description],

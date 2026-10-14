@@ -67,6 +67,13 @@ export type CommercialTower = {
   quantity: string;
   /** Port named in 1.2 / 1.3, e.g. "Brisbane" ("C&F Brisbane Port"). */
   port: string;
+  /**
+   * Also offered assembled: the same tower gets a second pricing schedule at `assembledPrice`, and the first is
+   * the CKD (Complete Knock Down) one. Missing on proposals saved before the option: CKD only.
+   */
+  assembledOption?: boolean;
+  /** 1.1 price per unit (AUD) of the assembled tower. */
+  assembledPrice?: string;
 };
 
 /** 1.2 / 1.3 amount: price x quantity (as a plain number string), or the price if either isn't a number. */
@@ -340,7 +347,7 @@ export function resolvedCommercialTowers(data: TowerSource) {
       // Spec-linked fields are all text fields.
       // Proposals saved before Equipment No. came from the RFQ keep the one typed on the Commercial tab.
       const fallback = key === "equipment" ? tower.equipment.trim() : "";
-      if (specKey) (resolved as Record<string, string>)[key] = spec[specKey].trim() || fallback;
+      if (specKey) (resolved as Record<string, unknown>)[key] = spec[specKey].trim() || fallback;
     }
     if (index === 0) {
       // Tower 1's model is always the Technical Proposal cover's Model.

@@ -83,6 +83,8 @@ function snapshot(data: ProposalData): Snapshot {
     for (const row of SPEC_ROWS) add(`${t}.spec.${row.key}`, `${t} ${row.label}`, spec[row.key], i);
     const tower = data.commercial.towers[i];
     for (const [key, label] of TOWER_LABELS) add(`${t}.${key}`, `${t} ${label}`, tower?.[key], i);
+    add(`${t}.assembledOption`, `${t} Assembled Option`, tower?.assembledOption ? "Yes" : "No", i);
+    if (tower?.assembledOption) add(`${t}.assembledPrice`, `${t} Assembled Sales Price`, tower.assembledPrice, i);
     towerScope(data, i).forEach((item, row) => add(`${t}.scope.${row}`, `${t} Scope of Supply`, scopeText(item), i));
     const extra = data.selectionSummary[i];
     if (extra) {

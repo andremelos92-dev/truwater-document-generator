@@ -97,7 +97,7 @@ function ScanStar() {
  * Same order as the equipment table in the Commercial Proposal document. `wide` fields take a full row
  * on phones, which also keeps the half-width ones paired up.
  */
-const TOWER_FIELDS: { key: keyof CommercialTower; label: string; placeholder?: string; wide?: boolean }[] = [
+const TOWER_FIELDS: { key: Exclude<keyof CommercialTower, "assembledOption">; label: string; placeholder?: string; wide?: boolean }[] = [
   { key: "equipment", label: "Equipment No.", placeholder: "e.g. CT1 & CT2" },
   { key: "model", label: "Cooling Tower Model", placeholder: "e.g. ECF1212F4-1B-1" },
   { key: "cells", label: "No. Of Cells", placeholder: "e.g. 3" },
@@ -163,14 +163,13 @@ export function CommercialProposal({
     return index === 0 ? "RFQ" : `Specification ${index + 1}`;
   };
 
-  const setTowerField = (index: number, key: keyof CommercialTower, value: string) => {
+  const setTower = (index: number, patch: Partial<CommercialTower>) => {
     updateCommercialField(
       "towers",
-      data.commercial.towers.map((tower, towerIndex) =>
-        towerIndex === index ? { ...tower, [key]: value } : tower
-      )
+      data.commercial.towers.map((tower, towerIndex) => (towerIndex === index ? { ...tower, ...patch } : tower))
     );
   };
+  const setTowerField = (index: number, key: keyof CommercialTower, value: string) => setTower(index, { [key]: value });
 
   const setScopeField = (
     tower: number,
@@ -274,7 +273,8 @@ export function CommercialProposal({
               <div className="bg-muted/40 grid grid-cols-2 gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,1.5fr)_5rem_minmax(0,1.5fr)_minmax(0,1.2fr)]">
                 <div className="col-span-2 grid content-start gap-1.5 sm:col-span-1">
                   <Label htmlFor={`commercial-tower-${index}-price`}>
-                    1.1 Sales Price (AUD){marked(towerBox(index, "price")) && <ScanStar />}
+                    1.1 Sales Price{tower.assembledOption ? " – CKD" : ""} (AUD)
+                    {marked(towerBox(index, "price")) && <ScanStar />}
                   </Label>
                   <Input
                     id={`commercial-tower-${index}-price`}
@@ -304,7 +304,9 @@ export function CommercialProposal({
                   />
                 </div>
                 <div className="grid content-start gap-1.5">
-                  <Label htmlFor={`commercial-tower-${index}-total`}>Total (AUD)</Label>
+                  <Label htmlFor={`commercial-tower-${index}-total`}>
+                    Total{tower.assembledOption ? " – CKD" : ""} (AUD)
+                  </Label>
                   <Input
                     id={`commercial-tower-${index}-total`}
                     readOnly
@@ -343,6 +345,64 @@ export function CommercialProposal({
                     />
                   )}
                 </div>
+                <label className="col-span-2 flex w-fit cursor-pointer items-center gap-2 text-sm sm:col-span-4">
+                  <input
+                    type="checkbox"
+                    className="accent-primary size-4"
+                    checked={!!tower.assembledOption}
+                    onChange={(event) => setTower(index, { assembledOption: event.target.checked })}
+                  />
+                  Also offer it assembled
+                  <span className="text-muted-foreground text-xs">
+                    (a second pricing schedule, same tower: one CKD, one assembled)
+                  </span>
+                </label>
+                {tower.assembledOption && (
+                  <>
+                    <div className="col-span-2 grid content-start gap-1.5 sm:col-span-1">
+                      <Label htmlFor={`commercial-tower-${index}-assembledPrice`}>1.1 Sales Price – Assembled (AUD)</Label>
+                      <Input
+                        id={`commercial-tower-${index}-assembledPrice`}
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        placeholder="e.g. 412000"
+                        className="bg-background"
+                        value={tower.assembledPrice ?? ""}
+                        onChange={(event) => setTower(index, { assembledPrice: event.target.value })}
+                      />
+                    </div>
+                    <div className="grid content-start gap-1.5">
+                      <Label htmlFor={`commercial-tower-${index}-assembledQuantity`}>Qty</Label>
+                      <Input
+                        id={`commercial-tower-${index}-assembledQuantity`}
+                        readOnly
+                        tabIndex={-1}
+                        title="Same as the CKD quantity"
+                        className="bg-muted cursor-default focus-visible:ring-0"
+                        value={tower.quantity}
+                      />
+                    </div>
+                    <div className="grid content-start gap-1.5">
+                      <Label htmlFor={`commercial-tower-${index}-assembledTotal`}>Total – Assembled (AUD)</Label>
+                      <Input
+                        id={`commercial-tower-${index}-assembledTotal`}
+                        readOnly
+                        tabIndex={-1}
+                        placeholder="Price × qty"
+                        className="bg-muted cursor-default font-semibold focus-visible:ring-0"
+                        value={
+                          tower.assembledPrice?.trim()
+                            ? currency.format(
+                                Number(towerTotal({ price: tower.assembledPrice, quantity: tower.quantity })) || 0
+                              )
+                            : ""
+                        }
+                      />
+                    </div>
+                  </>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
                 {TOWER_FIELDS.map(({ key, label, placeholder, wide }) => {
