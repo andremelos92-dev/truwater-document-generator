@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Calculator,
+  FolderKanban,
   FileText,
   History,
   LayoutDashboard,
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Documents", href: "/documents", icon: FileText },
   { label: "History", href: "/history", icon: History },
+  { label: "Projects", href: "/projects", icon: FolderKanban, masterOnly: true },
   { label: "Tower Selector", href: "/selector", icon: Calculator, masterOnly: true },
   { label: "Account", href: "/account", icon: UserRound },
 ];
