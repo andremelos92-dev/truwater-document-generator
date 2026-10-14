@@ -44,7 +44,11 @@ export type ModelDetails = {
   /** Plan size (for EVAPCO nominal: the name's feet, rounded up to whole feet by the maker). */
   widthMm: number;
   lengthMm: number;
-  /** The CTI table rates one cell (Truwater EC-S): towers of 2–4 cells side by side are offered too. */
+  /** Overall height (mm, to the top of the casing, without the fan motor), when the maker's data sheet gives it. */
+  heightMm?: number;
+  /** Fans (one motor each) per cell, when more than one (Truwater FH-S 2627A2: 2). */
+  fansPerCell?: number;
+  /** The CTI table rates one cell (Truwater EC-S, FH-S): towers of 2–4 cells side by side are offered too. */
   perCell?: boolean;
 };
 
@@ -65,7 +69,14 @@ const FOOT = 304.8;
 
 /** Truwater EC-S motor size letter (kW per fan), from the EC-S Series Range data sheets. */
 const TRUWATER_KW: Record<string, number> = {
-  X: 1.5, Y: 2.2, Z: 3, A: 4, B: 5.5, C: 7.5, D: 11, E: 15, F: 18.5, G: 22, H: 30, I: 37, J: 45, K: 55, L: 75,
+  X: 1.5, Y: 2.2, Z: 3, A: 4, B: 5.5, C: 7.5, D: 11, E: 15, F: 18.5, G: 22, H: 30, I: 37, J: 45, K: 55, L: 75, M: 90,
+};
+
+/** Truwater FH-S (closed circuit) box size -> overall L × W × H (mm) per cell, from the FH-S Series data sheets. */
+const TRUWATER_FHS_BOX: Record<string, [number, number, number]> = {
+  "2618": [1830, 2600, 5422], "2627": [2760, 2600, 5422], "2636": [3680, 2600, 5422], "2654": [5480, 2600, 5422],
+  "3636": [3680, 3600, 5622], "3654": [5480, 3600, 5622],
+  "7230": [3000, 7200, 4290], "7336": [3600, 7340, 5812], "8042": [4200, 8000, 5812],
 };
 
 /** Truwater EC-S nominal box size -> overall L × W (mm) per cell, from the EC-S Series Range data sheets. */
@@ -81,8 +92,25 @@ const TRUWATER_BOX: Record<string, [number, number]> = {
  * - EVAPCO "AT 212-4N40F": 2 cells, unit 12 ft wide, 4 layers of fill, N = 40 HP per fan, unit 40 ft long.
  * - Truwater EC-S "1212G" / "ECS 1212G4-2B" / "0606X_-1U": box 1212, G = 22 kW, cells after the dash (CTI rows are
  *   per cell).
+ * - Truwater FH-S "3636A2-B" / "FHS 3636E2-1B": box 3636, A = 4 kW per fan, 2 fans, -1 cell, B = belt drive (CTI rows
+ *   are per cell; the double flow 7230 / 7336 / 8042 have one fan).
  */
 export function modelDetails(name: string): ModelDetails | null {
+  const fhs = /^(?:FH[SXF]\s*)?(\d{4})([A-Z])(\d)?(?:-(\d+))?-?[A-Z]*$/.exec(name.trim());
+  if (fhs && TRUWATER_FHS_BOX[fhs[1]]) {
+    const [, box, letter, fans, cells] = fhs;
+    const [cellLength, widthMm, heightMm] = TRUWATER_FHS_BOX[box];
+    const count = Number(cells ?? 1);
+    return {
+      cells: count,
+      motorKw: TRUWATER_KW[letter],
+      widthMm,
+      lengthMm: cellLength * count,
+      heightMm,
+      fansPerCell: Number(fans ?? 1),
+      perCell: !cells,
+    };
+  }
   const truwater = /^(?:i?EC[SFTX]\s*)?(\d{4})([A-Z])[\d_]?(?:-(\d+)[A-Z]*)?$/.exec(name.trim());
   if (truwater && TRUWATER_BOX[truwater[1]]) {
     const [, box, letter, cells] = truwater;
@@ -162,11 +190,14 @@ export function selectTowers(tables: MakerTable[], duty: Duty): Candidate[] {
       for (const cells of cellCounts) {
         const flow = estimate.flow * cells;
         if (flow < duty.flow) continue;
+        // "1212G" -> "1212G-2"; with a drive letter, the cells go before it: "3636A2-B" -> "3636A2-2B".
+        const base = model.name.replace(/[_-]+$/, "");
+        const multiCell = /-[A-Z]+$/.test(base) ? base.replace(/-([A-Z]+)$/, `-${cells}$1`) : `${base}-${cells}`;
         candidates.push({
           tableId: table.id,
           maker: table.maker,
           series: table.series,
-          model: cells > 1 ? `${model.name.replace(/[_-]+$/, "")}-${cells}` : model.name,
+          model: cells > 1 ? multiCell : model.name,
           estimate: { ...estimate, flow, nearest: { ...estimate.nearest, flow: estimate.nearest.flow * cells } },
           margin: (flow / duty.flow - 1) * 100,
           details: details && cells > 1 ? { ...details, cells, lengthMm: details.lengthMm * cells } : details,
@@ -177,9 +208,12 @@ export function selectTowers(tables: MakerTable[], duty: Duty): Candidate[] {
   return candidates.sort((a, b) => a.margin - b.margin);
 }
 
+/** Fans in the whole tower. */
+export const fanCount = (d: ModelDetails) => d.cells * (d.fansPerCell ?? 1);
+
 /** Total motor power of a model (all fans), when known. */
 export const totalKw = (c: Candidate) =>
-  c.details?.motorKw !== undefined ? c.details.motorKw * c.details.cells : undefined;
+  c.details?.motorKw !== undefined ? c.details.motorKw * fanCount(c.details) : undefined;
 
 /** Plan area in m², when known. */
 export const planArea = (c: Candidate) =>
@@ -217,7 +251,7 @@ function score(c: Candidate, duty: Duty, minMargin: number, smallestArea: number
   total += hasSpace(duty) ? 2 * spaceMiss(d, duty) : 2 * ((d.lengthMm * d.widthMm) / 1e6 / smallestArea - 1);
   if (d.motorKw === undefined) total += 0.5;
   else if (duty.motorKw) total += 1.5 * motorMiss(d.motorKw, duty);
-  else total += 0.5 * ((d.motorKw * d.cells) / lowestKw - 1);
+  else total += 0.5 * ((d.motorKw * fanCount(d)) / lowestKw - 1);
   if (duty.cells) total += Math.abs(d.cells - duty.cells);
   return total;
 }

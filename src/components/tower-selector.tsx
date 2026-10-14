@@ -14,6 +14,7 @@ import { readDocument } from "@/lib/scan-source";
 import {
   bestPerMaker,
   dutyProblem,
+  fanCount,
   matchNotes,
   planArea,
   rankTowers,
@@ -79,6 +80,18 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 /** Cooling tower makers recognised in a file name. */
 const KNOWN_MAKERS = ["Truwater", "Evapco", "BAC", "Marley", "SPX", "Shinwa", "Liang Chi", "Kuken", "Aqua Cool", "Lakeside"];
 
+/** The tower type a CTI certificate names, if it names exactly one. */
+function towerTypeIn(text: string): TowerType | undefined {
+  const found = (
+    [
+      ["closed-circuit", /closed[\s-]*circuit/i],
+      ["crossflow", /cross[\s-]*flow/i],
+      ["counterflow", /counter[\s-]*flow/i],
+    ] as const
+  ).filter(([, pattern]) => pattern.test(text));
+  return found.length === 1 ? found[0][0] : undefined;
+}
+
 function makerFromFile(name: string): string {
   const known = KNOWN_MAKERS.find((maker) => name.toLowerCase().replace(/[_-]/g, " ").includes(maker.toLowerCase()));
   if (known) return known;
@@ -128,7 +141,7 @@ export function TowerSelector() {
     series: string;
     towerType: TowerType;
   } | null>(null);
-  const rfqRef = useRef<HTMLInputElement>(null);
+  const docRef = useRef<HTMLInputElement>(null);
   const tableRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
@@ -229,9 +242,9 @@ export function TowerSelector() {
     setShown(PAGE);
   };
 
-  /** Fills the duty from an RFQ, bid form or spec (read in the browser, nothing is uploaded). */
-  async function scanRfq(file: File) {
-    setBusy("rfq");
+  /** Fills the duty from an RFQ, Technical Proposal, bid form or spec (read in the browser, nothing is uploaded). */
+  async function scanDoc(file: File) {
+    setBusy("doc");
     setMessage(null);
     try {
       const result = parseScan(toLines(await readDocument(file, () => {})));
@@ -271,8 +284,12 @@ export function TowerSelector() {
     setBusy("table");
     setMessage(null);
     try {
-      const table = parseCtiTable(await readDocument(file, () => {}, { maxPages: 500 }));
-      setPending({ fileName: file.name, table, maker: makerFromFile(file.name), series: "", towerType });
+      const pages = await readDocument(file, () => {}, { maxPages: 500 });
+      const table = parseCtiTable(pages);
+      // The certificate's title names the kind of tower ("… CTI Certified Closed Circuit Cooling Towers").
+      const type = towerTypeIn(pages.flat().map((item) => item.text).join(" ")) ?? towerType;
+      setPending({ fileName: file.name, table, maker: makerFromFile(file.name), series: "", towerType: type });
+      setTowerType(type);
     } catch (err) {
       console.error(err);
       setMessage({ tone: "error", text: err instanceof Error ? err.message : "The table couldn't be read." });
@@ -363,24 +380,25 @@ export function TowerSelector() {
         <CardHeader className="grid-cols-[minmax(0,1fr)_auto]">
           <CardTitle>Duty</CardTitle>
           <CardDescription className="col-start-1">
-            From the RFQ. Range and approach are worked out from the temperatures.
+            Type the duty, or scan an RFQ or Technical Proposal to fill it in. Range and approach are worked out from
+            the temperatures.
           </CardDescription>
           <div className="col-start-2 row-span-2 row-start-1 self-start">
-            <Button type="button" variant="outline" size="sm" disabled={!!busy} onClick={() => rfqRef.current?.click()}>
-              {busy === "rfq" ? <Loader2 className="animate-spin" /> : <ScanLine />} Scan RFQ
+            <Button type="button" variant="outline" size="sm" disabled={!!busy} onClick={() => docRef.current?.click()}>
+              {busy === "doc" ? <Loader2 className="animate-spin" /> : <ScanLine />} Scan doc
             </Button>{" "}
             <Button type="button" variant="outline" size="sm" disabled={!!busy} onClick={() => tableRef.current?.click()}>
               {busy === "table" ? <Loader2 className="animate-spin" /> : <FileUp />} Attach CTI doc
             </Button>
             <input
-              ref={rfqRef}
+              ref={docRef}
               type="file"
               accept="application/pdf,image/*"
               className="hidden"
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 event.target.value = "";
-                if (file) void scanRfq(file);
+                if (file) void scanDoc(file);
               }}
             />
           </div>
@@ -555,7 +573,7 @@ export function TowerSelector() {
             <MakerComparison picks={bestPerMaker(results, comparedMakers, margin)} minMargin={margin} />
             <p className="px-6 pb-2 text-sm font-semibold">Every tower that cools the duty, best match first</p>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
+              <table className="w-full min-w-[840px] text-sm">
                 <thead>
                   <tr className="text-muted-foreground border-b text-left text-xs">
                     <th className="px-6 py-2 font-medium">Model</th>
@@ -564,6 +582,12 @@ export function TowerSelector() {
                     <th className="px-2 py-2 font-medium">Motor per fan</th>
                     <th className="px-2 py-2 text-right font-medium">Cells</th>
                     <th className="px-2 py-2 font-medium">Plan (L × W mm)</th>
+                    <th
+                      className="px-2 py-2 text-right font-medium"
+                      title="Overall height to the top of the casing (without the fan motor), from the maker's data sheet"
+                    >
+                      Height (mm)
+                    </th>
                     <th className="px-6 py-2 font-medium">Nearest certified point</th>
                   </tr>
                 </thead>
@@ -595,9 +619,19 @@ export function TowerSelector() {
                             ? `${c.details.motorKw} kW${c.details.motorHp ? ` (${c.details.motorHp} HP)` : ""}`
                             : "–"}
                         </td>
-                        <td className="px-2 py-2 text-right">{c.details?.cells ?? "–"}</td>
+                        <td className="px-2 py-2 text-right">
+                          {c.details?.cells ?? "–"}
+                          {c.details && c.details.fansPerCell && c.details.fansPerCell > 1 && (
+                            <span className="text-muted-foreground block text-xs">
+                              {fanCount(c.details)} fans
+                            </span>
+                          )}
+                        </td>
                         <td className="px-2 py-2 tabular-nums">
                           {c.details ? `${fmt(c.details.lengthMm, 0)} × ${fmt(c.details.widthMm, 0)}` : "–"}
+                        </td>
+                        <td className="px-2 py-2 text-right tabular-nums">
+                          {c.details?.heightMm ? fmt(c.details.heightMm, 0) : "–"}
                         </td>
                         <td className="text-muted-foreground px-6 py-2 text-xs">
                           #{near.index + 1}: WB {near.condition.wetBulb} · R {near.condition.range} · A{" "}
@@ -767,8 +801,11 @@ function Pick({ label, candidate, highlight }: { label: string; candidate: Candi
       {d && (
         <p className="text-sm">
           {d.cells} {d.cells === 1 ? "cell" : "cells"}
-          {d.motorKw !== undefined && ` · ${d.cells > 1 ? `${d.cells} × ` : ""}${d.motorKw} kW${d.cells > 1 && kw ? ` (${fmtNumber(kw)} kW)` : ""}`}
-          {area !== undefined && ` · ${fmtNumber(d.lengthMm, 0)} × ${fmtNumber(d.widthMm, 0)} mm`}
+          {d.motorKw !== undefined &&
+            ` · ${fanCount(d) > 1 ? `${fanCount(d)} × ` : ""}${d.motorKw} kW${fanCount(d) > 1 && kw ? ` (${fmtNumber(kw)} kW)` : ""}`}
+          {area !== undefined && ` · ${fmtNumber(d.lengthMm, 0)} × ${fmtNumber(d.widthMm, 0)}`}
+          {d.heightMm ? ` × ${fmtNumber(d.heightMm, 0)} H` : ""}
+          {area !== undefined && " mm"}
         </p>
       )}
     </div>

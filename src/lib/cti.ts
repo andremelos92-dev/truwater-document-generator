@@ -82,7 +82,15 @@ export function parseCtiTable(pages: TextItem[][]): CtiTable {
     const wetBulb = labelled(/^wet bulb/i);
     const range = labelled(/^range/i);
     const approach = labelled(/^approach/i);
-    conditions ??= columns.map((_, i) => ({ wetBulb: wetBulb[i], range: range[i], approach: approach[i] }));
+    // Some tables (Truwater FH-S closed circuit) give the inlet and outlet water temperatures instead.
+    const inlet = labelled(/^inlet water/i);
+    const outlet = labelled(/^outlet water/i);
+    const round = (n: number) => Math.round(n * 100) / 100;
+    conditions ??= columns.map((_, i) => ({
+      wetBulb: wetBulb[i],
+      range: range[i] ?? round(inlet[i] - outlet[i]),
+      approach: approach[i] ?? round(outlet[i] - wetBulb[i]),
+    }));
 
     const firstColumn = columns[0] - spacing * 0.6;
     for (const row of pageRows) {
@@ -91,13 +99,15 @@ export function parseCtiTable(pages: TextItem[][]): CtiTable {
       // Section breaks print as a row of zeros under a "0" label.
       if (!label || /^[\d\s.]*$/.test(label) || /^(wet bulb|range|approach|inlet|outlet|condition)/i.test(label)) continue;
       const cells = row.items.filter((i) => i.x + i.width >= firstColumn);
-      if (cells.length < columns.length / 2) continue;
       const flows: (number | null)[] = columns.map(() => null);
       for (const cell of cells) {
         const at = columnOf(cell);
         const text = cell.text.trim();
         if (at >= 0 && NUMBER.test(text)) flows[at] = Number(text);
       }
+      // Some models are certified at only a few conditions (the rest left blank, not "NC"); a row with no flow at
+      // all is a heading or a note.
+      if (flows.every((flow) => flow === null)) continue;
       models.set(label.replace(/\s+/g, " "), { name: label.replace(/\s+/g, " "), flows });
     }
   }
