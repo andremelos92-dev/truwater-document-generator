@@ -160,9 +160,9 @@ export type CommercialScheduleStep = {
 
 /** People who can sign the Commercial Proposal cover letter (their signatures are in the template). */
 export const SIGNATORIES = [
+  { id: "andre", name: "Andre Santos", title: "Sales & Application Engineer", phone: "+61 (0)420 559 560" },
   { id: "craig", name: "Craig Alcorn", title: "Sales & Project Manager", phone: "+(61)0476 202 471" },
   { id: "kenx", name: "Kenx Wong", title: "Sales Director", phone: "(6)012-236 7782" },
-  { id: "andre", name: "Andre Santos", title: "Sales & Application Engineer", phone: "+61 (0)420 559 560" },
 ] as const;
 
 export type SignatoryId = (typeof SIGNATORIES)[number]["id"];
@@ -211,12 +211,10 @@ const STRUCTURAL_MATERIALS = ["FRP", "SS304", "SS316"];
 
 export function createInitialCommercialProposal(): CommercialProposalData {
   return {
-    revisions: [
-      { ...createRevision("0"), preparedBy: "Craig Alcorn", checkedBy: "Kenx Wong", approvedBy: "WK How" },
-    ],
+    revisions: [createRevision("0")],
     attention: "",
-    signature1: "craig",
-    signature2: "kenx",
+    signature1: "andre",
+    signature2: "craig",
     towers: [createBlankTower()],
     extraScopes: [],
     scope: [
