@@ -1,4 +1,11 @@
-import { createEmptySpec, createInitialProposal, projectTitle, type ProposalData } from "@/lib/proposal";
+import {
+  createEmptySpec,
+  createInitialProposal,
+  projectTitle,
+  type CommercialProposalData,
+  type CommercialScopeItem,
+  type ProposalData,
+} from "@/lib/proposal";
 
 /** A saved project (one per TTA quote number) as History lists it: its latest name and save, and how many saves. */
 export type ProjectSummary = {
@@ -36,6 +43,23 @@ export function historyTitle(data: ProposalData): string {
   return (projectTitle(data) || "Untitled").slice(0, 120);
 }
 
+/** Saves from before the "Mechanical" scope item became "Mechanical Support" (with HDGS offered) get the new one. */
+function renameMechanical(commercial: CommercialProposalData): CommercialProposalData {
+  const fix = (scope: CommercialScopeItem[]) =>
+    scope.map((item) =>
+      item.description === "Mechanical"
+        ? {
+            ...item,
+            description: "Mechanical Support",
+            materialOptions: item.materialOptions?.includes("HDGS")
+              ? item.materialOptions
+              : [...(item.materialOptions ?? []), "HDGS"],
+          }
+        : item
+    );
+  return { ...commercial, scope: fix(commercial.scope), extraScopes: commercial.extraScopes?.map(fix) };
+}
+
 /** Restores saved form data, filling in anything added to the form since it was saved. */
 export function restoreProposal(saved: Partial<ProposalData>): ProposalData {
   const initial = createInitialProposal();
@@ -44,6 +68,6 @@ export function restoreProposal(saved: Partial<ProposalData>): ProposalData {
     ...saved,
     spec: { ...initial.spec, ...saved.spec },
     extraSpecs: (saved.extraSpecs ?? initial.extraSpecs).map((spec) => ({ ...createEmptySpec(), ...spec })),
-    commercial: { ...initial.commercial, ...saved.commercial },
+    commercial: renameMechanical({ ...initial.commercial, ...saved.commercial }),
   };
 }

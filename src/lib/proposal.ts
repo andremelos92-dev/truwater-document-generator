@@ -220,7 +220,7 @@ export function createInitialCommercialProposal(): CommercialProposalData {
     scope: [
       { material: "SS316", materialOptions: STRUCTURAL_MATERIALS, description: "Frameworks", responsibility: "Truwater" },
       { material: "SS316", materialOptions: STRUCTURAL_MATERIALS, description: "Cold Water Basin Supporting Framework", responsibility: "Truwater" },
-      { material: "SS316", materialOptions: STRUCTURAL_MATERIALS, description: "Mechanical", responsibility: "Truwater" },
+      { material: "SS316", materialOptions: [...STRUCTURAL_MATERIALS, "HDGS"], description: "Mechanical Support", responsibility: "Truwater" },
       { material: "SS316", materialOptions: [...STRUCTURAL_MATERIALS, "HDGS"], description: "Bolt & Nut & Hardware’s Wetted Parts", responsibility: "Truwater" },
       { material: "SS316", materialOptions: [...STRUCTURAL_MATERIALS, "HDGS"], description: "Bolt & Nut & Hardware’s Non-wetted Parts", responsibility: "Truwater" },
       { material: "PP", materialOptions: ["PP"], description: "Spray nozzle", responsibility: "Truwater" },
