@@ -44,9 +44,20 @@ export type Stage = {
   date: string;
 };
 
+/** Someone to talk to on the project. */
+export type Contact = {
+  id: string;
+  kind: ContactKind;
+  name: string;
+  phone: string;
+  email: string;
+};
+
 export type FollowUp = {
   id: string;
   who: ContactKind;
+  /** The contact to talk to, when one is picked. */
+  contactId?: string;
   /** e.g. "Call Aaron about the revised offer". */
   what: string;
   /** Due date (YYYY-MM-DD), or "" for no date. */
@@ -64,6 +75,7 @@ export type TrackedProject = {
   customer: string;
   status: ProjectStatus;
   stages: Record<StageId, Stage>;
+  contacts: Contact[];
   followUps: FollowUp[];
   /** Newest first. */
   notes: Note[];
@@ -90,6 +102,7 @@ export function createProject(quote: string, name: string, customer: string, id:
     customer: customer.trim(),
     status: "active",
     stages: Object.fromEntries(STAGES.map((s) => [s.id, { status: "todo", date: "" }])) as Record<StageId, Stage>,
+    contacts: [],
     followUps: [],
     notes: [],
     createdAt: now,
@@ -102,6 +115,13 @@ export function restoreProject(saved: TrackedProject): TrackedProject {
   const blank = createProject(saved.quote ?? "", saved.name ?? "", saved.customer ?? "", saved.id);
   return { ...blank, ...saved, stages: { ...blank.stages, ...saved.stages } };
 }
+
+/** The person a follow-up is with, if one was picked (and is still on the project). */
+export const contactOf = (project: TrackedProject, followUp: FollowUp): Contact | undefined =>
+  followUp.contactId ? project.contacts.find((c) => c.id === followUp.contactId) : undefined;
+
+/** A phone number as a link the phone can dial: "0412 345 678" -> "tel:0412345678". */
+export const telLink = (phone: string) => `tel:${phone.replace(/[^\d+]/g, "")}`;
 
 /** Done (or not needed) out of all the stages. */
 export function progress(project: TrackedProject): { done: number; total: number } {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { BellRing, ChevronDown, ExternalLink, Loader2, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { BellRing, ChevronDown, ExternalLink, Loader2, Mail, Phone, Plus, Trash2, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { projectKey, projectUrl, type ProjectSummary } from "@/lib/history";
 import {
   CONTACT_KINDS,
+  contactOf,
   createProject,
   dueState,
   newId,
@@ -21,7 +22,9 @@ import {
   PROJECT_STATUSES,
   STAGE_STATUSES,
   STAGES,
+  telLink,
   today,
+  type Contact,
   type ContactKind,
   type FollowUp,
   type ProjectStatus,
@@ -297,7 +300,7 @@ export function ProjectTracker() {
                   <span className={cn("w-28 shrink-0", DUE_STYLE[dueState(followUp.due)])}>{dueLabel(followUp.due)}</span>
                   <div className="min-w-0 flex-1">
                     <p>
-                      <span className="text-muted-foreground">{followUp.who}:</span> {followUp.what}
+                      <Who project={project} followUp={followUp} /> {followUp.what}
                     </p>
                     <button
                       type="button"
@@ -392,12 +395,14 @@ function ProjectCard({
   const documentsKey = projectKey(project.quote);
   const hasDocuments = !!documentsKey && historyKeys.has(documentsKey);
   const next = openFollowUps(project)[0];
-  const [followUp, setFollowUp] = useState<{ who: ContactKind; what: string; due: string }>({
+  const [followUp, setFollowUp] = useState<{ who: ContactKind; contactId?: string; what: string; due: string }>({
     who: "Customer",
     what: "",
     due: "",
   });
   const [note, setNote] = useState("");
+  const blankContact = { kind: "Customer" as ContactKind, name: "", phone: "", email: "" };
+  const [contact, setContact] = useState(blankContact);
 
   const setStage = (id: StageId, status: StageStatus) =>
     onSave({ ...project, stages: { ...project.stages, [id]: { status, date: today() } } });
@@ -415,7 +420,11 @@ function ProjectCard({
             {project.quote && <span className="text-muted-foreground mr-1.5 font-medium">{project.quote}</span>}
             {project.name}
           </p>
-          <p className="text-muted-foreground truncate text-xs">{project.customer || "No customer yet"}</p>
+          <p className="text-muted-foreground truncate text-xs">
+            {project.customer || "No customer yet"}
+            {project.contacts[0] &&
+              ` · ${[project.contacts[0].name, project.contacts[0].phone].filter(Boolean).join(" ")}`}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {STAGES.map((stage) => {
@@ -439,7 +448,7 @@ function ProjectCard({
             <>
               <p className={DUE_STYLE[dueState(next.due)]}>{dueLabel(next.due)}</p>
               <p className="text-muted-foreground truncate">
-                {next.who}: {next.what}
+                {contactOf(project, next)?.name || next.who}: {next.what}
               </p>
             </>
           ) : (
@@ -534,9 +543,96 @@ function ProjectCard({
           </div>
 
           <div className="grid gap-2">
+            <p className="text-sm font-semibold">Contacts</p>
+            <form
+              className="grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)_10rem_minmax(0,1fr)_auto] sm:items-end"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!contact.name.trim()) return;
+                const added: Contact = {
+                  id: newId(),
+                  kind: contact.kind,
+                  name: contact.name.trim(),
+                  phone: contact.phone.trim(),
+                  email: contact.email.trim(),
+                };
+                onSave({ ...project, contacts: [...project.contacts, added] });
+                setContact({ ...blankContact, kind: contact.kind });
+              }}
+            >
+              <NativeSelect
+                aria-label="Role"
+                value={contact.kind}
+                onChange={(event) => setContact({ ...contact, kind: event.target.value as ContactKind })}
+              >
+                {CONTACT_KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {kind}
+                  </option>
+                ))}
+              </NativeSelect>
+              <Input
+                aria-label="Name"
+                placeholder="Name, e.g. Aaron Hughes"
+                value={contact.name}
+                onChange={(event) => setContact({ ...contact, name: event.target.value })}
+              />
+              <Input
+                aria-label="Phone"
+                type="tel"
+                placeholder="Phone"
+                value={contact.phone}
+                onChange={(event) => setContact({ ...contact, phone: event.target.value })}
+              />
+              <Input
+                aria-label="Email"
+                type="email"
+                placeholder="Email (optional)"
+                value={contact.email}
+                onChange={(event) => setContact({ ...contact, email: event.target.value })}
+              />
+              <Button type="submit" variant="outline" disabled={!contact.name.trim()}>
+                <Plus /> Add
+              </Button>
+            </form>
+            {project.contacts.length > 0 && (
+              <ul className="divide-y rounded-lg border">
+                {project.contacts.map((c) => (
+                  <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-sm">
+                    <span className="min-w-0 flex-1">
+                      <span className="font-medium">{c.name}</span>{" "}
+                      <span className="text-muted-foreground text-xs">{c.kind}</span>
+                    </span>
+                    {c.phone && (
+                      <a href={telLink(c.phone)} className="text-primary inline-flex items-center gap-1 hover:underline">
+                        <Phone className="size-3.5" /> {c.phone}
+                      </a>
+                    )}
+                    {c.email && (
+                      <a href={`mailto:${c.email}`} className="text-primary inline-flex items-center gap-1 hover:underline">
+                        <Mail className="size-3.5" /> {c.email}
+                      </a>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      aria-label={`Delete ${c.name}`}
+                      onClick={() => onSave({ ...project, contacts: project.contacts.filter((x) => x.id !== c.id) })}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="grid gap-2">
             <p className="text-sm font-semibold">Follow-ups</p>
             <form
-              className="grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)_10rem_auto] sm:items-end"
+              className="grid gap-2 sm:grid-cols-[13rem_minmax(0,1fr)_10rem_auto] sm:items-end"
               onSubmit={(event) => {
                 event.preventDefault();
                 if (!followUp.what.trim()) return;
@@ -549,14 +645,32 @@ function ProjectCard({
             >
               <NativeSelect
                 aria-label="Who"
-                value={followUp.who}
-                onChange={(event) => setFollowUp({ ...followUp, who: event.target.value as ContactKind })}
+                value={followUp.contactId ? `contact:${followUp.contactId}` : followUp.who}
+                onChange={(event) => {
+                  const picked = project.contacts.find((c) => `contact:${c.id}` === event.target.value);
+                  setFollowUp(
+                    picked
+                      ? { ...followUp, who: picked.kind, contactId: picked.id }
+                      : { ...followUp, who: event.target.value as ContactKind, contactId: undefined }
+                  );
+                }}
               >
-                {CONTACT_KINDS.map((kind) => (
-                  <option key={kind} value={kind}>
-                    {kind}
-                  </option>
-                ))}
+                {project.contacts.length > 0 && (
+                  <optgroup label="Contacts">
+                    {project.contacts.map((c) => (
+                      <option key={c.id} value={`contact:${c.id}`}>
+                        {c.name} ({c.kind})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="Anyone">
+                  {CONTACT_KINDS.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {kind}
+                    </option>
+                  ))}
+                </optgroup>
               </NativeSelect>
               <Input
                 aria-label="What to follow up"
@@ -596,7 +710,7 @@ function ProjectCard({
                         {f.done ? "Done" : dueLabel(f.due)}
                       </span>
                       <span className={cn("min-w-0 flex-1", f.done && "line-through")}>
-                        <span className="text-muted-foreground">{f.who}:</span> {f.what}
+                        <Who project={project} followUp={f} /> {f.what}
                       </span>
                       <Button
                         type="button"
@@ -677,5 +791,25 @@ function ProjectCard({
         </CardContent>
       )}
     </Card>
+  );
+}
+
+/** Who a follow-up is with: the contact's name and phone (tap to call) when one was picked, else the role. */
+function Who({ project, followUp }: { project: TrackedProject; followUp: FollowUp }) {
+  const contact = contactOf(project, followUp);
+  if (!contact) return <span className="text-muted-foreground">{followUp.who}:</span>;
+  return (
+    <span className="text-muted-foreground">
+      {contact.name} ({contact.kind}
+      {contact.phone && (
+        <>
+          ,{" "}
+          <a href={telLink(contact.phone)} className="text-primary hover:underline">
+            {contact.phone}
+          </a>
+        </>
+      )}
+      ):
+    </span>
   );
 }
